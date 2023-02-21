@@ -59,6 +59,34 @@ void() OgreGrenadeTouch =
 		self.avelocity = '0 0 0';
 }
 
+void() OgreRocketTouch =
+{
+	local float	damg;
+
+	if (other == self.owner) return;		// don't explode on owner
+	if (CheckProjectilePassthru()) return;
+
+	if (pointcontents(self.origin) == CONTENT_SKY)
+	{
+		remove(self);
+		return;
+	}
+
+	damg = 50;
+	if (other.health)
+	{
+		if (other.type == "zombie")
+			damg = max(damg, other.health + 25);	// so ogre rockets kill zombies despite being too weak
+		T_Damage(other, self, self.trueowner, damg);
+	}
+
+	// don't do radius damage to other, because all damage will be done in the impact
+	T_RadiusDamage(self, self.trueowner, damg, other);
+
+	self.origin = self.origin - 8*normalize(self.velocity);
+	T_ExplosiveTouch();
+}
+
 /*
 ================
 OgreAimGrenade
@@ -118,7 +146,27 @@ void() OgreFireGrenade =
 	g.th_die = OgreGrenadeExplode;
 }
 
+void() OgreFireRocket =
+{
+	local entity rocket;
+	vector org, vec;
+	
+	self.effects = self.effects | EF_MUZZLEFLASH;
+	sound (self, CHAN_WEAPON, "weapons/grenade.wav", 1, ATTN_NORM);
 
+	makevectors(self.angles);
+	org = self.origin + v_forward * 16;
+	vec = normalize(enemy_vispos() - org + enemy_aim_vertical());
+	if (angledif(self.ideal_yaw, self.angles_y) > 80) // no ass rockets
+	{
+		vec_x = v_forward_x;
+		vec_y = v_forward_y;
+		vec = normalize(vec);
+	}
+	
+	rocket = launch_rocket(org, vec * 800);
+	rocket.touch = OgreRocketTouch;	
+}
 
 void() ogre_dropammo =
 {
@@ -262,7 +310,11 @@ void() ogre_nail3	=[	$shoot2,		ogre_nail4	] {ai_face();}
 void() ogre_nail4	=[	$shoot3,		ogre_nail5	] 
 {
 	ai_face();
+	if (self.classname == "monster_ogre") {
 		OgreFireGrenade();
+	} else {
+		OgreFireRocket();
+	}
 }
 void() ogre_nail5	=[	$shoot4,		ogre_nail6	] {ai_face();}
 void() ogre_nail6	=[	$shoot5,		ogre_nail7	] {ai_face();}
@@ -554,8 +606,82 @@ void() monster_ogre =
 	monster_ogre_spawn();
 }
 
-void() monster_ogre_marksman =
+void() monster_rocket_ogre_spawn =
 {
-	monster_ogre ();
+	self.classname = "monster_rocket_ogre";
+	self.type = "ogre";
+	
+	self.solid = SOLID_SLIDEBOX;
+	//self.movetype = MOVETYPE_STEP;
+
+	setmodel (self, "progs/ogre.mdl");
+
+	setsize (self, VEC_HULL2_MIN, '32 32 40');
+	self.health = 200;
+
+	self.th_stand = ogre_stand1;
+	self.th_walk = ogre_walk1;
+	self.th_run = ogre_run1;
+	self.th_die = ogre_die;
+	self.th_melee = ogre_melee;
+	self.th_missile = ogre_nail1;
+	self.th_pain = ogre_pain;
+	self.th_checkattack = OgreCheckAttack;
+
+	if (self.deathtype == string_null)
+		self.deathtype = "was destroyed by an Ogre";
+
+	walkmonster_start();
+}
+
+void() monster_rocket_ogre_spawner = {mon_spawner_use(monster_rocket_ogre_spawn);}
+
+/*QUAKED monster_rocket_ogre (1 0 0) (-32 -32 -24) (32 32 40) AMBUSH ? ? ? TRIGGERED NOTFOG NOTELEFRAG INSTAWAKE
+Rocket Ogre, 200 health points.
+
+Flags:
+"ambush" only wake up on seeing the player, not another monster getting angry
+
+"Triggered"	will not spawn until triggered - triggering again will wake him up. Set 'count' to make this a multi-use spawner.
+"NoTfog" 	supress teleport glitter when spawned with 'triggered'
+"NoTelefrag" will silently fail to spawn if doing so would telefrag an existing monster. will try again automatically 2x/second until it succeeds.
+"Instawake" spawn angry at activator
+
+Keys:
+"target" entity to trigger when killed
+"targetname" entity name
+"movedir" set to a velocity to make the monster jump on awakening
+*/
+/*FGD
+@PointClass base(Monster) size(-32 -32 -24, 32 32 64) model({ "path": ":progs/ogre.mdl" }) = monster_rocket_ogre : "Rocket Ogre" []
+*/
+void() monster_rocket_ogre =
+{
+	if (!SUB_ShouldSpawn()) return;
+	if (nomonster()) return;
+	if (deathmatch)
+	{
+		remove(self);
+		return;
+	}
+
+	precache_model ("progs/ogre.mdl");
+	precache_model ("progs/h_ogre.mdl");
+	precache_model ("progs/grenade.mdl");
+
+	precache_sound ("ogre/ogdrag.wav");
+	precache_sound ("ogre/ogdth.wav");
+	precache_sound ("ogre/ogidle.wav");
+	precache_sound ("ogre/ogidle2.wav");
+	precache_sound ("ogre/ogpain1.wav");
+	precache_sound ("ogre/ogsawatk.wav");
+	precache_sound ("ogre/ogwake.wav");
+	
+	self.health = 200;
+	setsize (self, VEC_HULL2_MIN, '32 32 40');
+	if ( monster_spawnsetup( monster_rocket_ogre_spawner ) ) return;
+	
+	addmonster(1);
+	monster_rocket_ogre_spawn();
 }
 
