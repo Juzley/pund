@@ -37,7 +37,7 @@ $frame pull1 pull2 pull3 pull4 pull5 pull6 pull7 pull8 pull9 pull10 pull11
 void() OgreGrenadeExplode =
 {
 	T_RadiusDamage (self, self.trueowner, 40, world);
-	//sound (self, CHAN_VOICE, "weapons/r_exp3.wav", 1, ATTN_NORM);
+	sound (self, CHAN_VOICE, "weapons/r_exp3.wav", 1, ATTN_NORM);
 	
 	T_ExplosiveTouch();
 }
@@ -57,6 +57,34 @@ void() OgreGrenadeTouch =
 	sound (self, CHAN_VOICE, "weapons/bounce.wav", 1, ATTN_NORM);	// bounce sound
 	if (self.velocity == '0 0 0')
 		self.avelocity = '0 0 0';
+}
+
+void() OgreRocketTouch =
+{
+	local float	damg;
+
+	if (other == self.owner) return;		// don't explode on owner
+	if (CheckProjectilePassthru()) return;
+
+	if (pointcontents(self.origin) == CONTENT_SKY)
+	{
+		remove(self);
+		return;
+	}
+
+	damg = 50;
+	if (other.health)
+	{
+		if (other.type == "zombie")
+			damg = max(damg, other.health + 25);	// so ogre rockets kill zombies despite being too weak
+		T_Damage(other, self, self.trueowner, damg);
+	}
+
+	// don't do radius damage to other, because all damage will be done in the impact
+	T_RadiusDamage(self, self.trueowner, damg, other);
+
+	self.origin = self.origin - 8*normalize(self.velocity);
+	T_ExplosiveTouch();
 }
 
 /*
@@ -82,19 +110,12 @@ vector(vector dest, float speed) OgreAimGrenade =
 	a = vectoyaw(dest);
 	angs = '0 0 0';
 	angs_y = a;
-	
 	// clamp the perfect terminator-aim to limit deadon shots to the face, then average with 
 	// old dumb aim for "z-only-slightly-aware"ness(tm)
 	if (vlen(dest) < 160)
-		theta = clamp(theta, -80, 70);
+		theta = (clamp(theta, -80, 70) + 18) / 2;
 	else
-		theta = clamp(theta, -60, 60);
-		
-	if (skill == 3)
-		theta = (theta + theta + 18) / 3; // nightmare: 66% z-awareness
-	else
-		theta = (theta + 18) / 2;	// copper: 50% z-awareness
-		
+		theta = (clamp(theta, -60, 60) + 18) / 2;
 	angs_x = -theta;	
 	makevectors(angs);
 	
@@ -125,7 +146,27 @@ void() OgreFireGrenade =
 	g.th_die = OgreGrenadeExplode;
 }
 
+void() OgreFireRocket =
+{
+	local entity rocket;
+	vector org, vec;
+	
+	self.effects = self.effects | EF_MUZZLEFLASH;
+	sound (self, CHAN_WEAPON, "weapons/grenade.wav", 1, ATTN_NORM);
 
+	makevectors(self.angles);
+	org = self.origin + v_forward * 16;
+	vec = normalize(enemy_vispos() - org + enemy_aim_vertical());
+	if (angledif(self.ideal_yaw, self.angles_y) > 80) // no ass rockets
+	{
+		vec_x = v_forward_x;
+		vec_y = v_forward_y;
+		vec = normalize(vec);
+	}
+	
+	rocket = launch_rocket(org, vec * 800);
+	rocket.touch = OgreRocketTouch;	
+}
 
 void() ogre_dropammo =
 {
@@ -163,7 +204,7 @@ local float 	ldmg;
 		return;
 		
 	ldmg = (random() + random() + random()) * 4;
-	T_Damage (self.enemy, self, self, ldmg, DMGTYPE_MELEE);
+	T_DamageMelee (self.enemy, self, ldmg);
 	
 	if (side)
 	{
@@ -266,14 +307,22 @@ void() ogre_smash14	=[	$smash14,		ogre_run1	] {ai_charge(12);}
 void() ogre_nail1	=[	$shoot1,		ogre_nail2	] {ai_face();}
 void() ogre_nail2	=[	$shoot2,		ogre_nail3	] {ai_face();}
 void() ogre_nail3	=[	$shoot2,		ogre_nail4	] {ai_face();}
-void() ogre_nail4	=[	$shoot3,		ogre_nail5	] {ai_face(); OgreFireGrenade();}
-void() ogre_nail5	=[	$shoot4,		ogre_nail6	] {ai_face(); ai_check_refire(ogre_nail6l);}
+void() ogre_nail4	=[	$shoot3,		ogre_nail5	] 
+{
+	ai_face();
+	if (self.classname == "monster_ogre") {
+		OgreFireGrenade();
+	} else {
+		OgreFireRocket();
+	}
+}
+void() ogre_nail5	=[	$shoot4,		ogre_nail6	] {ai_face();}
 void() ogre_nail6	=[	$shoot5,		ogre_nail7	] {ai_face();}
 void() ogre_nail7	=[	$shoot6,		ogre_run1	] {
 	ai_face();
+	//ai_check_refire(ogre_nail2);
 	ai_attack_finished (1 + 2*random());
 }
-void() ogre_nail6l	=[	$shoot6,		ogre_nail2	] {ai_face();}
 
 /*
 ===========
@@ -325,24 +374,24 @@ float() OgreCheckAttack =
 }
 
 
-void()	ogre_pain1	=[	$pain1,		ogre_pain2	] {PainFinished(1); }
+void()	ogre_pain1	=[	$pain1,		ogre_pain2	] { }
 void()	ogre_pain2	=[	$pain2,		ogre_pain3	] {}
 void()	ogre_pain3	=[	$pain3,		ogre_pain4	] {}
 void()	ogre_pain4	=[	$pain4,		ogre_pain5	] {}
 void()	ogre_pain5	=[	$pain5,		ogre_run1	] {}
 
-void()	ogre_painb1	=[	$painb1,	ogre_painb2	] {PainFinished(1); }
+void()	ogre_painb1	=[	$painb1,	ogre_painb2	] { }
 void()	ogre_painb2	=[	$painb2,	ogre_painb3	] {}
 void()	ogre_painb3	=[	$painb3,	ogre_run1	] {}
 
-void()	ogre_painc1	=[	$painc1,	ogre_painc2	] { PainFinished(1);}
+void()	ogre_painc1	=[	$painc1,	ogre_painc2	] { }
 void()	ogre_painc2	=[	$painc2,	ogre_painc3	] {}
 void()	ogre_painc3	=[	$painc3,	ogre_painc4	] {}
 void()	ogre_painc4	=[	$painc4,	ogre_painc5	] {}
 void()	ogre_painc5	=[	$painc5,	ogre_painc6	] {}
 void()	ogre_painc6	=[	$painc6,	ogre_run1	] {}
 
-void()	ogre_paind1	=[	$paind1,	ogre_paind2	] { PainFinished(2);}
+void()	ogre_paind1	=[	$paind1,	ogre_paind2	] { }
 void()	ogre_paind2	=[	$paind2,	ogre_paind3	] {ai_pain(10);}
 void()	ogre_paind3	=[	$paind3,	ogre_paind4	] {ai_pain(9);}
 void()	ogre_paind4	=[	$paind4,	ogre_paind5	] {ai_pain(4);}
@@ -350,16 +399,16 @@ void()	ogre_paind5	=[	$paind5,	ogre_paind6	] {}
 void()	ogre_paind6	=[	$paind6,	ogre_paind7	] {}
 void()	ogre_paind7	=[	$paind7,	ogre_paind8	] {}
 void()	ogre_paind8	=[	$paind8,	ogre_paind9	] {}
-void()	ogre_paind9	=[	$paind9,	ogre_paind10] {}
-void()	ogre_paind10=[	$paind10,	ogre_paind11] {}
-void()	ogre_paind11=[	$paind11,	ogre_paind12] {}
-void()	ogre_paind12=[	$paind12,	ogre_paind13] {}
-void()	ogre_paind13=[	$paind13,	ogre_paind14] {}
-void()	ogre_paind14=[	$paind14,	ogre_paind15] {}
-void()	ogre_paind15=[	$paind15,	ogre_paind16] {}
+void()	ogre_paind9	=[	$paind9,	ogre_paind10	] {}
+void()	ogre_paind10=[	$paind10,	ogre_paind11	] {}
+void()	ogre_paind11=[	$paind11,	ogre_paind12	] {}
+void()	ogre_paind12=[	$paind12,	ogre_paind13	] {}
+void()	ogre_paind13=[	$paind13,	ogre_paind14	] {}
+void()	ogre_paind14=[	$paind14,	ogre_paind15	] {}
+void()	ogre_paind15=[	$paind15,	ogre_paind16	] {}
 void()	ogre_paind16=[	$paind16,	ogre_run1	] {}
 
-void()	ogre_paine1	=[	$paine1,	ogre_paine2	] {PainFinished(2); }
+void()	ogre_paine1	=[	$paine1,	ogre_paine2	] { }
 void()	ogre_paine2	=[	$paine2,	ogre_paine3	] {ai_pain(10);}
 void()	ogre_paine3	=[	$paine3,	ogre_paine4	] {ai_pain(9);}
 void()	ogre_paine4	=[	$paine4,	ogre_paine5	] {ai_pain(4);}
@@ -367,12 +416,12 @@ void()	ogre_paine5	=[	$paine5,	ogre_paine6	] {}
 void()	ogre_paine6	=[	$paine6,	ogre_paine7	] {}
 void()	ogre_paine7	=[	$paine7,	ogre_paine8	] {}
 void()	ogre_paine8	=[	$paine8,	ogre_paine9	] {}
-void()	ogre_paine9	=[	$paine9,	ogre_paine10] {}
-void()	ogre_paine10=[	$paine10,	ogre_paine11] {}
-void()	ogre_paine11=[	$paine11,	ogre_paine12] {}
-void()	ogre_paine12=[	$paine12,	ogre_paine13] {}
-void()	ogre_paine13=[	$paine13,	ogre_paine14] {}
-void()	ogre_paine14=[	$paine14,	ogre_paine15] {}
+void()	ogre_paine9	=[	$paine9,	ogre_paine10	] {}
+void()	ogre_paine10=[	$paine10,	ogre_paine11	] {}
+void()	ogre_paine11=[	$paine11,	ogre_paine12	] {}
+void()	ogre_paine12=[	$paine12,	ogre_paine13	] {}
+void()	ogre_paine13=[	$paine13,	ogre_paine14	] {}
+void()	ogre_paine14=[	$paine14,	ogre_paine15	] {}
 void()	ogre_paine15=[	$paine15,	ogre_run1	] {}
 
 
@@ -386,19 +435,31 @@ void(entity attacker, float damage)	ogre_pain =
 		
 	sound (self, CHAN_VOICE, "ogre/ogpain1.wav", 1, ATTN_NORM);		
 	r = random();
-	if (skill == 3)
-		r *= random();	// nightmare: make the long stuns rare
-	
 	if (r < 0.25)
-		ogre_painb1 ();	// shortest
-	else if (r < 0.5)
+	{
 		ogre_pain1 ();
+		PainFinished(1);
+	}
+	else if (r < 0.5)
+	{
+		ogre_painb1 ();
+		PainFinished(1);
+	}
 	else if (r < 0.75)
+	{
 		ogre_painc1 ();
+		PainFinished(1);
+	}
 	else if (r < 0.88)
-		ogre_paine1 ();
+	{
+		ogre_paind1 ();
+		PainFinished(2);
+	}
 	else
-		ogre_paind1 ();	// longest
+	{
+		ogre_paine1 ();
+		PainFinished(2);
+	}
 }
 
 void()	ogre_die1	=[	$death1,	ogre_die2	] {}
@@ -545,8 +606,82 @@ void() monster_ogre =
 	monster_ogre_spawn();
 }
 
-void() monster_ogre_marksman =
+void() monster_rocket_ogre_spawn =
 {
-	monster_ogre ();
+	self.classname = "monster_rocket_ogre";
+	self.type = "ogre";
+	
+	self.solid = SOLID_SLIDEBOX;
+	//self.movetype = MOVETYPE_STEP;
+
+	setmodel (self, "progs/ogre.mdl");
+
+	setsize (self, VEC_HULL2_MIN, '32 32 40');
+	self.health = 200;
+
+	self.th_stand = ogre_stand1;
+	self.th_walk = ogre_walk1;
+	self.th_run = ogre_run1;
+	self.th_die = ogre_die;
+	self.th_melee = ogre_melee;
+	self.th_missile = ogre_nail1;
+	self.th_pain = ogre_pain;
+	self.th_checkattack = OgreCheckAttack;
+
+	if (self.deathtype == string_null)
+		self.deathtype = "was destroyed by an Ogre";
+
+	walkmonster_start();
+}
+
+void() monster_rocket_ogre_spawner = {mon_spawner_use(monster_rocket_ogre_spawn);}
+
+/*QUAKED monster_rocket_ogre (1 0 0) (-32 -32 -24) (32 32 40) AMBUSH ? ? ? TRIGGERED NOTFOG NOTELEFRAG INSTAWAKE
+Rocket Ogre, 200 health points.
+
+Flags:
+"ambush" only wake up on seeing the player, not another monster getting angry
+
+"Triggered"	will not spawn until triggered - triggering again will wake him up. Set 'count' to make this a multi-use spawner.
+"NoTfog" 	supress teleport glitter when spawned with 'triggered'
+"NoTelefrag" will silently fail to spawn if doing so would telefrag an existing monster. will try again automatically 2x/second until it succeeds.
+"Instawake" spawn angry at activator
+
+Keys:
+"target" entity to trigger when killed
+"targetname" entity name
+"movedir" set to a velocity to make the monster jump on awakening
+*/
+/*FGD
+@PointClass base(Monster) size(-32 -32 -24, 32 32 64) model({ "path": ":progs/ogre.mdl" }) = monster_rocket_ogre : "Rocket Ogre" []
+*/
+void() monster_rocket_ogre =
+{
+	if (!SUB_ShouldSpawn()) return;
+	if (nomonster()) return;
+	if (deathmatch)
+	{
+		remove(self);
+		return;
+	}
+
+	precache_model ("progs/ogre.mdl");
+	precache_model ("progs/h_ogre.mdl");
+	precache_model ("progs/grenade.mdl");
+
+	precache_sound ("ogre/ogdrag.wav");
+	precache_sound ("ogre/ogdth.wav");
+	precache_sound ("ogre/ogidle.wav");
+	precache_sound ("ogre/ogidle2.wav");
+	precache_sound ("ogre/ogpain1.wav");
+	precache_sound ("ogre/ogsawatk.wav");
+	precache_sound ("ogre/ogwake.wav");
+	
+	self.health = 200;
+	setsize (self, VEC_HULL2_MIN, '32 32 40');
+	if ( monster_spawnsetup( monster_rocket_ogre_spawner ) ) return;
+	
+	addmonster(1);
+	monster_rocket_ogre_spawn();
 }
 
