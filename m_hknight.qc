@@ -493,11 +493,12 @@ void() monster_hell_knight_spawn =
 
 void() monster_hell_knight_spawner = {mon_spawner_use(monster_hell_knight_spawn);}
 
-/*QUAKED monster_hell_knight (1 0 0) (-16 -16 -24) (16 16 40) AMBUSH ? ? ? TRIGGERED NOTFOG NOTELEFRAG INSTAWAKE
+/*QUAKED monster_hell_knight (1 0 0) (-16 -16 -24) (16 16 40) AMBUSH ALTERNATEATTACK ? ? TRIGGERED NOTFOG NOTELEFRAG INSTAWAKE
 "Death" Knight, 250 health points.
 
 Flags:
 "ambush" only wake up on seeing the player, not another monster getting angry
+"AlternateAttack" tighter, quicker attack pattern
 "Triggered"	will not spawn until triggered - triggering again will wake him up. Set 'count' to make this a multi-use spawner.
 "NoTfog" 	supress teleport glitter when spawned with 'triggered'
 "NoTelefrag" will silently fail to spawn if doing so would telefrag an existing monster. will try again automatically 2x/second until it succeeds.
