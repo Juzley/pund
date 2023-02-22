@@ -417,7 +417,7 @@ launch_knightspike
 hellknight spreadfire
 ========
 */
-entity(vector org, vector vel) launch_knightspike =
+entity(vector org, vector vel, float hkdmg) launch_knightspike =
 {
 	entity spike;
 	
@@ -425,7 +425,7 @@ entity(vector org, vector vel) launch_knightspike =
 	spike.touch = spike_touch;
 	SUB_ChangeModel (spike, "progs/k_spike.mdl");
 	
-	spike.dmg = 8;
+	spike.dmg = hkdmg;
 	
 	return spike;
 }

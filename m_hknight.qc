@@ -68,7 +68,34 @@ void(float offset) hknight_shot =
 	vec = normalize (v_forward);
 	vec_z += crandom() * 0.05;
 	
-	launch_knightspike (org, vec*425);
+	launch_knightspike (org, vec*425, 8);
+
+	sound (self, CHAN_WEAPON, "hknight/attack1.wav", 1, ATTN_NORM);
+}
+
+void(float offset) hknight_shot2 =
+{
+	vector	offang;
+	vector	org, vec;
+	
+	vec = enemy_vispos() - self.origin;
+	vec += enemy_aim_vertical();
+	vec_z += 0;
+	offang = vectoangles(vec);
+	offang_y = offang_y + offset * 6;
+	offang_x *= -1;
+	
+	if (angledif(self.ideal_yaw, offang_y) > 80)	// no assbolts
+		makevectors (self.angles + '0 1 0' * offset * 6);
+	else
+		makevectors (offang + '0 1 0' * offset * 6);
+
+	org = self.origin + self.mins + self.size*0.6 + v_forward * 20;
+
+// set missile speed
+	vec = normalize (v_forward);
+	
+	launch_knightspike (org, vec*680, 12);
 
 	sound (self, CHAN_WEAPON, "hknight/attack1.wav", 1, ATTN_NORM);
 }
@@ -219,14 +246,16 @@ void()	hknight_magica3 =[	$magica3,	hknight_magica4	] {ai_face();}
 void()	hknight_magica4 =[	$magica4,	hknight_magica5	] {ai_face();}
 void()	hknight_magica5 =[	$magica5,	hknight_magica6	] {ai_face();}
 void()	hknight_magica6 =[	$magica6,	hknight_magica7	] {ai_face();}
-void()	hknight_magica7 =[	$magica7,	hknight_magica8	] {hknight_shot(-2);}
-void()	hknight_magica8 =[	$magica8,	hknight_magica9	] {hknight_shot(-1);}
-void()	hknight_magica9 =[	$magica9,	hknight_magica10] {hknight_shot(0);}
-void()	hknight_magica10 =[	$magica10,	hknight_magica11] {hknight_shot(1);}
-void()	hknight_magica11 =[	$magica11,	hknight_magica12] {hknight_shot(2);}
-void()	hknight_magica12 =[	$magica12,	hknight_magica13] {hknight_shot(3);}
-void()	hknight_magica13 =[	$magica13,	hknight_magica14] {ai_face();}
-void()	hknight_magica14 =[	$magica14,	hknight_run1	] {ai_face();}
+void()	hknight_magica7 =[	$magica7,	hknight_magica8	] {hknight_shot2(0);}
+void()	hknight_magica8 =[	$magica8,	hknight_magica9	] {hknight_shot2(0);}
+void()	hknight_magica9 =[	$magica8,	hknight_magica10] {hknight_shot2(0);}
+void()	hknight_magica10 =[	$magica9,	hknight_magica11] {hknight_shot2(0);}
+void()	hknight_magica11 =[	$magica9,	hknight_magica12] {hknight_shot2(0);}
+void()	hknight_magica12 =[	$magica10,	hknight_magica13] {hknight_shot2(0);}
+void()	hknight_magica13 =[	$magica11,	hknight_magica14] {hknight_shot2(0);}
+void()	hknight_magica14 =[	$magica12,	hknight_magica15] {ai_face();}
+void()	hknight_magica15 =[	$magica13,	hknight_magica16] {ai_face();}
+void()	hknight_magica16 =[	$magica14,	hknight_run1	] {ai_face();}
 
 //============================================================================
 // not used
@@ -353,6 +382,18 @@ void() hknight_pain_go =
 	PainFinished(1);
 }
 
+void() hknight_magic =
+{
+	if (self.spawnflags & 2)
+	{
+		hknight_magica1 ();
+	}
+	else 
+	{ 
+		hknight_magicc1 ();
+	}
+}
+
 void(entity attacker, float damage)	hknight_pain =
 {
 	if (self.pain_finished > time)
@@ -404,7 +445,7 @@ void() monster_hell_knight_spawn =
 	self.th_walk = hknight_walk1;
 	self.th_run = hknight_run1;
 	self.th_melee = hknight_melee;
-	self.th_missile = hknight_magicc1;
+	self.th_missile = hknight_magic;
 	self.th_pain = hknight_pain;
 	self.th_die = hknight_die;
 	self.th_checkattack = CheckAttack;
