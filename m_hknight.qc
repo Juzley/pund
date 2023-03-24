@@ -384,7 +384,7 @@ void() hknight_pain_go =
 
 void() hknight_magic =
 {
-	if (self.spawnflags & 2)
+	if (self.classname == "monster_pun_knight")
 	{
 		hknight_magica1 ();
 	}
@@ -450,7 +450,7 @@ void() monster_hell_knight_spawn =
 	self.th_die = hknight_die;
 	self.th_checkattack = CheckAttack;
 
-	self.type = "brigade";	// no infighting amongst the hell death brigade legion squad
+	self.type = "brigade";	// no infighting amongst the pun death brigade legion squad
 
 	if (self.deathtype == string_null)
 		self.deathtype = "was slain by a Death Knight";
@@ -515,4 +515,92 @@ void() monster_hell_knight =
 	
 	addmonster(1);
 	monster_hell_knight_spawn();
+}
+
+void() monster_pun_knight_spawn =
+{
+	self.classname = "monster_pun_knight";
+		
+	self.solid = SOLID_SLIDEBOX;
+	//self.movetype = MOVETYPE_STEP;
+
+	setmodel (self, "progs/hknight.mdl");
+
+	setsize (self, '-16 -16 -24', '16 16 40');
+
+	self.th_stand = hknight_stand1;
+	self.th_walk = hknight_walk1;
+	self.th_run = hknight_run1;
+	self.th_melee = hknight_melee;
+	self.th_missile = hknight_magic;
+	self.th_pain = hknight_pain;
+	self.th_die = hknight_die;
+	self.th_checkattack = CheckAttack;
+
+	self.type = "brigade";	// no infighting amongst the pun death brigade legion squad
+
+	if (self.deathtype == string_null)
+		self.deathtype = "was slain by a Dread Knight";
+
+	walkmonster_start ();
+}
+
+void() monster_pun_knight_spawner = {mon_spawner_use(monster_pun_knight_spawn);}
+
+/*QUAKED monster_pun_knight (1 0 0) (-16 -16 -24) (16 16 40) AMBUSH ALTERNATEATTACK ? ? TRIGGERED NOTFOG NOTELEFRAG INSTAWAKE
+Dread Knight, 250 health points.
+An upgraded Death Knight with a more deadly and precise ranged attack.
+
+Flags:
+"ambush" only wake up on seeing the player, not another monster getting angry
+"AlternateAttack" tighter, quicker attack pattern
+"Triggered"	will not spawn until triggered - triggering again will wake him up. Set 'count' to make this a multi-use spawner.
+"NoTfog" 	supress teleport glitter when spawned with 'triggered'
+"NoTelefrag" will silently fail to spawn if doing so would telefrag an existing monster. will try again automatically 2x/second until it succeeds.
+"Instawake" spawn angry at activator
+
+Keys:
+"target" entity to trigger when killed
+"targetname" entity name
+"movedir" set to a velocity to make the monster jump on awakening
+*/
+/*FGD
+@PointClass base(Monster) size(-16 -16 -24, 16 16 40) model({ "path": ":progs/hknight.mdl" }) = monster_pun_knight : "Dread knight" [
+	spawnflags(flags) = [
+		2 : "Alternate Attack" : 0
+	]
+]
+*/
+void() monster_pun_knight =
+{
+	if (!SUB_ShouldSpawn()) return;
+	if (nomonster()) return;
+	if (deathmatch)
+	{
+		remove(self);
+		return;
+	}
+	precache_model2 ("progs/hknight.mdl");
+	precache_model2 ("progs/k_spike.mdl");
+	precache_model2 ("progs/h_hellkn.mdl");
+
+	
+	precache_sound2 ("hknight/attack1.wav");
+	precache_sound2 ("hknight/death1.wav");
+	precache_sound2 ("hknight/pain1.wav");
+	precache_sound2 ("hknight/sight1.wav");
+	precache_sound ("hknight/hit.wav");		// used by C code, so don't sound2
+	precache_sound2 ("hknight/slash1.wav");
+	precache_sound2 ("hknight/idle.wav");
+	precache_sound2 ("hknight/grunt.wav");
+
+	precache_sound ("knight/sword1.wav");
+	precache_sound ("knight/sword2.wav");
+	
+	self.health = 250;
+	setsize (self, '-16 -16 -24', '16 16 40');
+	if ( monster_spawnsetup( monster_hell_knight_spawner ) ) return;
+	
+	addmonster(1);
+	monster_pun_knight_spawn();
 }
