@@ -599,7 +599,7 @@ void() monster_pun_knight =
 	
 	self.health = 250;
 	setsize (self, '-16 -16 -24', '16 16 40');
-	if ( monster_spawnsetup( monster_hell_knight_spawner ) ) return;
+	if ( monster_spawnsetup( monster_pun_knight_spawner ) ) return;
 	
 	addmonster(1);
 	monster_pun_knight_spawn();
