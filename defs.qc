@@ -391,6 +391,23 @@ string	keyType;
 .float fog_sky2 = width;
 
 
+// water
+entity liquidbrushfirst;
+.string liquidbrush;
+.float liquidtype;
+.vector liquidcolor;
+.float liquiddensity;
+.entity nextliquidbrush;
+.entity prevliquidbrush;
+
+
+// cshift controller
+.entity csfcontroller;
+.vector csf_color, csf_color_prev;
+.float csf_density, csf_density_prev;
+.float csf_priority, csf_priority_prev;
+
+
 //===========================================================================
 // builtin functions
 //===========================================================================

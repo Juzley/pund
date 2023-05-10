@@ -438,7 +438,8 @@ void() GibPlayer =
 	if (damage_attacker.classname == "trigger_void" || damage_attacker.classname == "func_void" )
 	{
 		sound (self, CHAN_VOICE, "player/splat1.wav", 1, ATTN_NONE);
-		stuffcmd( self, "\nv_cshift 16 0 0 255\n");
+		//stuffcmd( self, "\nv_cshift 16 0 0 255\n");
+		csf_set(self, 255, '16 0 0',70);
 		return;
 	}
 	

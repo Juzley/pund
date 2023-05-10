@@ -1441,14 +1441,12 @@ void() PlayerPreThink =
 	if (cleanUpClientShit)
 	{
 		fog_setFromEnt( self, self );
-		if ( !( self.customflags & (CFL_PLUNGE|CFL_LIMBO) ) )
-		{
-			stuffcmd(self,"\nv_cshift\n");
-		}
-		else if ( self.customflags & CFL_LIMBO )
+		csf_apply(self);
+		
+		/*else if ( self.customflags & CFL_LIMBO )
 		{
 			TintScreen(self, 255);
-		}
+		}*/
 	}
 
 	if (intermission_running || self.deadflag == DEAD_SPECTATING )
@@ -1503,6 +1501,11 @@ void() PlayerPreThink =
 		self.flags = self.flags | FL_FLY;
 	}
 	
+	// sanity check for cshift every few frames
+	if (framecount & 4) {
+		if (self.csf_priority == 0 && self.csf_density > 0)
+			csf_clear_all(self);
+	}
 	// ai_nav
 	//nav_editorThink();
 }
