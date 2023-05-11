@@ -401,6 +401,8 @@ entity liquidbrushfirst;
 .entity prevliquidbrush;
 
 
+
+
 // cshift controller
 .entity csfcontroller;
 .vector csf_color, csf_color_prev;
@@ -425,7 +427,7 @@ void(string e) error				= #10;
 void(string e) objerror				= #11;
 float(vector v) vlen				= #12;
 float(vector v) vectoyaw			= #13;
-entity() spawn						= #14;
+entity() spawn_builtin				= #14;
 void(entity e) remove				= #15;
 
 // sets trace_* globals

@@ -2,14 +2,20 @@ float LIQUID_WATER = 0;
 float LIQUID_SLIME = 1;
 float LIQUID_LAVA = 2;
 
+float LIQUIDTYPE_CONVERSION[] = {-3. -4, -5};
+
 float touchedliquidbrush;
 
-void() startupWaterBrushes = {
+void() startupWaterBrushes1 = {
 	entity e, prev;
+	float i;
+
+	dprint("Starting up water brushes... ");
 
 	e = find(world, liquidbrush, "1");
 	if (e) liquidbrushfirst = e;
 	while (e) {
+		i++;
 		e.solid = SOLID_NOT;
 		e.movetype = MOVETYPE_NOCLIP;
 		setorigin(e, e.origin);
@@ -22,6 +28,32 @@ void() startupWaterBrushes = {
 		}
 
 	}
+	dprint3("found ", ftos(i), "\n");
+};
+
+void() startupWaterBrushes = {
+	entity e, prev;
+	float i;
+	e = find(world, classname, "func_door");
+	if (e) liquidbrushfirst = e;
+	dprint("Starting up water brushes... ");
+	while (e) {
+		
+		i++;
+		//dprint2(ftos(i), "\n");
+		e.solid = SOLID_NOT;
+		e.movetype = MOVETYPE_NOCLIP;
+		setorigin(e, e.origin);
+
+		prev = e;
+		e = find(e, classname, "func_door");
+		if (e) {
+			prev.nextliquidbrush = e;
+			e.prevliquidbrush = prev;
+		}
+
+	}
+	dprint3("found ", ftos(i), "\n");
 };
 
 void() entity_watercheck = {
@@ -109,6 +141,7 @@ void() checkClientInWaterBrush = {
 			if (e.liquiddensity) dens = e.liquiddensity;
 
 			if (lvl >= 2) self.gravity = 0.000001;
+			else self.gravity = 1;
 
 			if (lvl >= 3){
 				csf_set(self, dens, cl, 70);
@@ -129,6 +162,7 @@ void() checkClientInWaterBrush = {
 	// so turn off everything if the entity was in one at the previous frame
 	if (self.flags & FL_INLIQUIDBRUSH) {
 		csf_clear(self, 70);
+		self.gravity = 1;
 		//self.watertype = CONTENT_EMPTY;
 		//self.waterlevel = 0;
 
@@ -147,7 +181,11 @@ float(vector org) pointcontents2 = {
 
 	entity e = liquidbrushfirst;
 	while (e) {
-		//liquidbrushchecks++;
+		pointcontentchecks++;
+		//if (pointcontentchecks % 500 == 0)
+		//	dprint3("Checked ", ftos(pointcontentchecks), " point contents\n");
+
+		
 		if (org_x > e.absmax_x) 
 			touched = 0;
 		else if (org_x < e.absmin_x)
@@ -162,13 +200,17 @@ float(vector org) pointcontents2 = {
 			touched = 0;
 		else 
 			touched = 1;
-
+		
+		//touched = getTouch(org, e);
+		
 		if (touched) {
 			touchedliquidbrush = TRUE;
 
-			if (e.liquidtype == LIQUID_LAVA) return CONTENT_LAVA;
-			else if (e.liquidtype == LIQUID_SLIME) return CONTENT_SLIME;
-			else return CONTENT_WATER;
+			//if (e.liquidtype == LIQUID_LAVA) return CONTENT_LAVA;
+			//else if (e.liquidtype == LIQUID_SLIME) return CONTENT_SLIME;
+			//else return CONTENT_WATER;
+			
+			return LIQUIDTYPE_CONVERSION[e.liquidtype];
 		}
 
 		e = e.nextliquidbrush;
@@ -224,4 +266,51 @@ float (vector org, entity e) getTouch = {
 		return 0;
 
 	return 1;
+}
+
+vector() WaterTest2 =
+{
+	if (self.movetype == MOVETYPE_NOCLIP)
+		return VEC_ORIGIN;
+		
+	float wl = 0;
+	float wt = 0;
+	float wp;
+	
+	// iw -- fix waterlevel detection
+	vector waist;
+
+	// this is how the engine calculates the player's waist height (see
+	// the "SV_CheckWater" function in "sv_phys.c")
+	waist = self.origin;
+	waist_z += (self.mins_z + self.maxs_z) * 0.5;
+
+	//wp = pointcontents(self.origin);
+	wp = pointcontents(waist);
+	// iw -- END
+	if (wp < -2 && wp > -6)
+	{
+		wl += 1;
+		wt = min(wt,wp);
+	}
+	wp = pointcontents(self.origin + self.mins);
+	if (wp < -2 && wp > -6)
+	{
+		wl += 1;
+		wt = min(wt,wp);
+	}
+	wp = pointcontents(self.origin + self.maxs);
+	if (wp < -2 && wp > -6)
+	{
+		wl += 1;
+		wt = min(wt,wp);
+	}
+	wp = pointcontents(self.origin + self.view_ofs);
+	if (wp < -2 && wp > -6)
+	{
+		wl += 1;
+		wt = min(wt,wp);
+	}
+	
+	return Vector(min(3,wl),wt,0);
 }

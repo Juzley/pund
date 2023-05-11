@@ -1035,6 +1035,7 @@ vector() WaterTest =
 /*
 ===========
 PlayerWaterTest
+deprecated, use checkClientInWaterBrush
 ============
 */
 void() PlayerWaterTest =
@@ -1108,7 +1109,7 @@ void() WaterMove =
 					{
 						i -= 75;
 						b = self.absmin + vec_scale(self.size, Vector(random(),random(),random()));
-						if (pointcontents(b) == CONTENT_WATER)
+						if (pointcontents2(b) == CONTENT_WATER)
 							bubble_spawn(b);
 					}
 				}
@@ -1162,7 +1163,7 @@ void() WaterMove =
 			{
 				self.deathtype = "lava";
 				// biosuit protects from lava if it's 16u deep or less
-				if (!(has_biosuit(self) && pointcontents(self.origin - '0 0 7') != CONTENT_LAVA))
+				if (!(has_biosuit(self) && pointcontents2(self.origin - '0 0 7') != CONTENT_LAVA))
 					T_Damage (self, world, world, 10 * self.waterlevel);
 				self.deathtype = string_null;
 			}
@@ -1470,7 +1471,7 @@ void() PlayerPreThink =
 
 	self.wait = 0;
 	
-	PlayerWaterTest();
+	//PlayerWaterTest();
 	WaterMove();
 	if (self.waterlevel == WL_WAIST)
 		CheckWaterJump ();
@@ -1500,7 +1501,8 @@ void() PlayerPreThink =
 	{
 		self.flags = self.flags | FL_FLY;
 	}
-	
+
+	checkClientInWaterBrush();
 	// sanity check for cshift every few frames
 	if (framecount & 4) {
 		if (self.csf_priority == 0 && self.csf_density > 0)
@@ -1520,6 +1522,8 @@ Called every frame after physics are run
 */
 void() PlayerPostThink =
 {
+	checkClientInWaterBrush();
+	
 	if ( intermission_running ) return;
 	
 	if (self.view_ofs == '0 0 0')
