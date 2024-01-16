@@ -6,14 +6,14 @@ ROCKETS
 ===============
 */
 
-
 void(vector org, float rad) T_GibDownedZombies =
 {
 	if (rad < 72) return;	// not a big enough blast
 	entity head;
-	head = findradiusplus(org + '0 0 16', rad, type, "zombie");
+	
 	// look a little too high since we'll assume zombies are lower than their 
 	// actual origin, which is 24u off the ground
+	head = findradiusplus(org + '0 0 16', rad, type, "zombie");
 	
 	while(head)
 	{

@@ -4,7 +4,8 @@ const string anumber[10] = { "anum_0", "anum_1", "anum_2", "anum_3", "anum_4", "
 const string powerupflash[6] = { "gfx/sb_","gfx/sba1_","gfx/sba2_","gfx/sba3_","gfx/sba4_","gfx/sba5_" };
 const float flash[11] = {2,3,4,5,2,3,4,5,1,0,0};
 
-const float weaponflags[7] = {
+const float weaponflags[8] = {
+	IT_AXE,
 	IT_SHOTGUN,
 	IT_SUPER_SHOTGUN,
 	IT_NAILGUN,
@@ -13,8 +14,10 @@ const float weaponflags[7] = {
 	IT_ROCKET_LAUNCHER,
 	IT_LIGHTNING
 };
-const string weaponflash[6] = { "gfx/inv_","gfx/inv2_","gfx/inva2_","gfx/inva3_","gfx/inva4_","gfx/inva5_" };	// use selected glow as a better last frame
-const string weaponlabel[7] = {	"shotgun","sshotgun","nailgun","snailgun","rlaunch","srlaunch","lightng" };
+const float weaponbits[8] = { 12, 0, 1, 2, 3, 4, 5, 6 };
+
+const string weaponflash[6] = { "gfx/inv_","gfx/inv2_","gfx/inva2_","gfx/inva3_","gfx/inva4_","gfx/inva1_" };	// use selected glow as a better last frame
+const string weaponlabel[8] = {	"axe","shotgun","sshotgun","nailgun","snailgun","rlaunch","srlaunch","lightng" };
 
 float stat_items, stat_items2, stat_health, keytype;
 float paintime, lookseed;
@@ -353,11 +356,11 @@ void(float wnum, vector pos, float sel) Hud_DrawWeapon
 	vector sz;
 	float fram;
 	
-	fram = HUD_FlashTime(wnum);
+	fram = HUD_FlashTime(weaponbits[wnum]);
 	if (sel && fram == 0) fram = 1;	// selected weapon glow
 	
 	sz = '24 16';
-	if (wnum == 6) sz = '48 16';
+	if (wnum == 7) sz = '48 16';
 	
 	string pic = strcat(weaponflash[fram], weaponlabel[wnum]);
 	
@@ -472,8 +475,8 @@ void Hud_DrawIBarWeapons(vector pos)
 	pos_y += 8;
 	for (i = 0; i < 7; i++)
 	{
-		if (stat_items & weaponflags[i])
-			Hud_DrawWeapon(i, pos + '24 0' * i, (currweap == weaponflags[i]));
+		if (stat_items & weaponflags[i+1])
+			Hud_DrawWeapon(i+1, pos + '24 0' * i, (currweap == weaponflags[i+1]));
 	}
 }
 
@@ -616,10 +619,10 @@ void Hud_DrawModernRight(vector pos, float expanded)
 
 void Hud_DrawModernWeapons(vector pos)
 {
-	pos += '0 -64';
+	pos += '0 -72';
 	float currweap = getstatf(STAT_ACTIVEWEAPON);
 	float i;
-	for (i = 6; i >= 0; i--)
+	for (i = 7; i >= 0; i--)
 	{
 		if (stat_items & weaponflags[i])
 		{
@@ -666,12 +669,14 @@ void() HUD_UpdateStats =
 {
 	float olditems, olditems2, i, f;
 	
+	coopdata = getstatf(STAT_CLIENTDATA);
+	if (intermission || coopdata == -1) return;
+	
 	olditems = stat_items;	
 	olditems2 = stat_items2;	
 	stat_items = getstatbits(STAT_ITEMS, 0, 23);
 	stat_items2 = getstatbits(STAT_ITEMS, 23, 9);
 	keytype = getstatbits(STAT_KEYCOUNTS, 8, 8);
-	coopdata = getstatf(STAT_CLIENTDATA);
 	scr_tint = getstatf(STAT_TINTAMOUNT);
 	scr_tintcolor_x = getstatf(STAT_TINTCOLOR_R);
 	scr_tintcolor_y = getstatf(STAT_TINTCOLOR_G);
@@ -754,9 +759,9 @@ void(vector screensize) Hud_DrawTint =
 
 void(vector screensize, float scoreboard) CSQC_DrawHud =
 {
+	HUD_UpdateStats();
 	if (intermission || coopdata == -1) return;
 	float viewsize = cvar("viewsize");
-	HUD_UpdateStats();
 	Hud_DrawTint(screensize);
 	
 	if (viewsize > 110)
@@ -824,12 +829,12 @@ void(vector screensize, float scoreboard) CSQC_DrawHud =
 
 void(vector screensize, float scoreboard) CSQC_DrawScores =
 {
+	HUD_UpdateStats();
 	if (!intermission || coopdata == -1) return;
 	vector pos, div;
 	float value, mins, secs;
 	string s;
 	
-	HUD_UpdateStats();
 	pos = [screensize_x / 2 - 160, screensize_y / 2 - 120];
 	
 	if (deathmatch)
@@ -924,6 +929,10 @@ void() Hud_Init
 		precache_pic(strcat(powerupflash[i], "invul"), TRUE);
 		precache_pic(strcat(powerupflash[i], "suit"), TRUE);
 		precache_pic(strcat(powerupflash[i], "quad"), TRUE);
+	}
+	for (i = 0; i < 6; i++)
+	{
+		precache_pic(strcat(weaponflash[i], "axe"), TRUE);
 	}
 	
 	precache_pic("gfx/sb_mkey1", TRUE);
