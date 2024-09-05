@@ -23,7 +23,7 @@ const float	FL_WATERJUMP			= 2048;	// player jumping out of water
 const float	FL_JUMPRELEASED			= 4096;	// for jump debouncing
 const float	FL_UNDERWATER			= 8192;	// for dive/surface water sounds
 const float FL_SWIM2				= 16384; // use this instead of FL_SWIM for liquid brush compatibility
-const float	FL_INLIQUIDBRUSH		= 32768;  // touching liquid brush
+const float	FL_INLIQUIDBRUSH		= 32768;  // mostly for monsters, covers both in standard water and in liquid brushes
 
 // edict.customflags
 const float	CFL_LEFTY			= 1;	// used by slidemovers (scrags) to alternate strafe direction

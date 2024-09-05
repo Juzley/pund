@@ -341,7 +341,7 @@ void( entity attacker ) T_ReactToDamage =
 	// all infighting cases follow:
 	
 	// fish should ignore monsters that aren't in the water with them
-	if (self.flags & FL_SWIM && pointcontents(attacker.origin) > CONTENT_WATER) return;
+	if (self.flags & (FL_SWIM | FL_SWIM2) && pointcontents(attacker.origin) > CONTENT_WATER) return;
 	
 	// get mad unless of the same class (except for soldiers)
 	// classname check replaced with new "type" check

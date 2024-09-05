@@ -467,11 +467,12 @@ void() EndFrame = {
 				(self.movetype == MOVETYPE_STEP ||
 				self.movetype == MOVETYPE_TOSS ||
 				self.movetype == MOVETYPE_BOUNCE ||
-				self.movetype == MOVETYPE_BOUNCEMISSILE)
+				self.movetype == MOVETYPE_BOUNCEMISSILE
+			)
 				&& !(self.flags & FL_CLIENT)
 			) {
 				entity_watercheck();
-				//dprint3("Liquid brushes checked: ", ftos(pointcontentchecks), "\n");
+				//dprint3("pointcontentchecks checked: ", ftos(pointcontentchecks), "\n");
 			}
 			self = nextent(self);
 		}

@@ -400,8 +400,10 @@ entity liquidbrushfirst;
 .entity nextliquidbrush;
 .entity prevliquidbrush;
 
+.float liquiddamage_finished;
+.float liquiddamage_take;
 
-
+.float nextthink1;
 
 // cshift controller
 .entity csfcontroller;

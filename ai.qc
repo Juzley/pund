@@ -902,60 +902,6 @@ void(entity vic) ai_approach_victim =
 }
 
 /*
-=============
-ai_check_liquid
-
-take damage from slime and lava. returns FALSE if monster died from it.
-=============
-*/
-float() ai_check_liquid =
-{
-	// there are hacked takedamage cthons out there, and they're all in the lava
-	if (self.type == "boss" || self.classname == "monster_rotfish")
-		return TRUE;
-		
-	vector wtt;
-	wtt = WaterTest();
-	float wl, wt;
-	wl = wtt_x;
-	wt = wtt_y;
-	
-	// never do liquid damage for some mild wading, since lots of ep3 has lava
-	// the monsters can step into and out of
-	if (wl < 3)
-		return TRUE;
-	
-	// monsters that spawn in slime/lava were clearly intended to be there by the
-	// mapper, so give them special dispensation to not quietly die before the 
-	// player ever finds them. also, revoke their liquid rights once they leave, so 
-	// they just die instead of staying lost if they fall back in
-	if (!wl)
-	{
-		self.customflags = not(self.customflags, CFL_LIQUID_IMMUNE);
-		return TRUE;
-	}
-	if (self.customflags & CFL_LIQUID_IMMUNE)
-		return TRUE;
-		
-	if (self.type == "zombie")
-	{
-		// zombies immune to slime (or else they just keep falling and getting up)
-		if (wt == CONTENT_LAVA)	// but always gib if touching lava
-			T_Damage(self, world, world, self.health + 10);
-	}
-	else
-	{
-		if (wt == CONTENT_LAVA)
-			T_Damage(self, world, world, wl * 10);
-		if (wt == CONTENT_SLIME && self.classname != "monster_wizard")
-			// scrags will happily fly down into slime, and they do spit green shit anyway
-			T_Damage(self, world, world, wl * 5);
-	}
-	
-	return self.health > 0;
-}
-
-/*
 ==============================================================================
 
 ANIMATION
@@ -1040,11 +986,11 @@ void(float dist) ai_floatmove_finish =
 	if (self.flags & (FL_FLY|FL_SWIM) == 0)
 		return;
 		
-	self.movetype = MOVETYPE_FLY;
+	//self.movetype = MOVETYPE_FLY;
 	move = self.origin - self.oldorigin;
 	
 	// fish have short bounding boxes, which in quake physics land means they can noclip through ceilings
-	if (pointcontents(self.origin) == CONTENT_SOLID)
+	if (pointcontents2(self.origin) == CONTENT_SOLID)
 	{
 		setorigin(self, self.oldorigin);
 		//dprint("detected move into solid\n");
@@ -1075,13 +1021,16 @@ void(float dist) ai_floatmove_finish =
 	// FL_SWIM just invalidates any movement out of water, so simulate velocity 
 	// being clipped off at the surface instead
 	// TODO: support water volumes that end in other directions than up
+
+	/*
 	if (self.flags & FL_SWIM)
 	{
 		if (!ai_fishmovecheck())
 			move_z = -1;
 	}
-	setorigin(self, self.oldorigin);
-	self.velocity = move / interv;
+	*/
+	//setorigin(self, self.oldorigin);
+	//self.velocity = move / interv;
 }
 
 /*
@@ -1147,7 +1096,6 @@ as part of normal melee-range attacks involving forward steps
 */
 void(float d) ai_rush =
 {
-	if (!ai_check_liquid()) return;
 	ai_face();
 	
 	if ( !walkmove_jitter(self.ideal_yaw, d) )
@@ -1186,7 +1134,6 @@ The monster is in a melee attack, so get as close as possible to .enemy
 */
 float(float d) ai_charge =
 {
-	if (!ai_check_liquid()) return FALSE;
 	
 	ai_face();
 	
@@ -1218,7 +1165,6 @@ void() ai_charge_side =
 	local	vector	dtemp;
 	local	float	heading;
 	
-	if (!ai_check_liquid()) return;
 	
 // aim to the left of the enemy for a flyby
 
@@ -1336,7 +1282,6 @@ The monster is walking its beat
 void(float dist) ai_walk =
 {
 	//movedist = dist;
-	if (!ai_check_liquid()) return;
 
 	// check for noticing a player
 	if (FindTarget ())
@@ -1355,9 +1300,8 @@ The monster is staying in one place for a while
 */
 void() ai_stand =
 {
-	if (!ai_check_liquid()) return;
 	
-	if (self.flags & (FL_FLY|FL_SWIM))
+	if (self.flags & (FL_FLY|FL_SWIM|FL_SWIM2))
 		self.velocity = '0 0 0';
 	
 	if (FindTarget ())
@@ -1470,7 +1414,6 @@ The monster has an enemy it is trying to kill
 */
 void(float dist) ai_run =
 {
-	if (!ai_check_liquid()) return;	// died in slime/lava already
 	
 	entity e;
 	
@@ -1565,6 +1508,6 @@ ai_nop
 */
 void() ai_nop =
 {
-	if (self.flags & (FL_FLY | FL_SWIM))
+	if (self.flags & (FL_FLY | FL_SWIM | FL_SWIM2))
 		self.velocity = '0 0 0';
 }

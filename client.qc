@@ -975,63 +975,6 @@ void() PlayerJump =
 }
 
 
-
-/*
-===========
-WaterTest
-test for liquids touching self from all directions
-
-doesn't set self.waterlevel/self.watertype directly because it's also used by
-monsters, and faffing with those values makes them spam constant splash noises
-============
-*/
-vector() WaterTest =
-{
-	if (self.movetype == MOVETYPE_NOCLIP)
-		return VEC_ORIGIN;
-		
-	float wl = 0;
-	float wt = 0;
-	float wp;
-	
-	// iw -- fix waterlevel detection
-	vector waist;
-
-	// this is how the engine calculates the player's waist height (see
-	// the "SV_CheckWater" function in "sv_phys.c")
-	waist = self.origin;
-	waist_z += (self.mins_z + self.maxs_z) * 0.5;
-
-	//wp = pointcontents(self.origin);
-	wp = pointcontents(waist);
-	// iw -- END
-	if (wp < -2 && wp > -6)
-	{
-		wl += 1;
-		wt = min(wt,wp);
-	}
-	wp = pointcontents(self.origin + self.mins);
-	if (wp < -2 && wp > -6)
-	{
-		wl += 1;
-		wt = min(wt,wp);
-	}
-	wp = pointcontents(self.origin + self.maxs);
-	if (wp < -2 && wp > -6)
-	{
-		wl += 1;
-		wt = min(wt,wp);
-	}
-	wp = pointcontents(self.origin + self.view_ofs);
-	if (wp < -2 && wp > -6)
-	{
-		wl += 1;
-		wt = min(wt,wp);
-	}
-	
-	return Vector(min(3,wl),wt,0);
-}
-
 /*
 ===========
 PlayerWaterTest
@@ -1523,7 +1466,7 @@ Called every frame after physics are run
 void() PlayerPostThink =
 {
 	checkClientInWaterBrush();
-	
+
 	if ( intermission_running ) return;
 	
 	if (self.view_ofs == '0 0 0')
