@@ -191,10 +191,10 @@ float(float in) bprint_int =
 
 //============================================================================
 
-float(entity who) has_invis = { return !!(who.items & IT_INVISIBILITY || who.invisible_finished > time); }
-float(entity who) has_quad = { return !!(who.items & IT_QUAD || who.super_damage_finished > time); }
-float(entity who) has_invuln = { return !!(who.items & IT_INVULNERABILITY || who.invincible_finished > time); }
-float(entity who) has_biosuit = { return !!(who.items & IT_SUIT || who.radsuit_finished > time); }
+float(entity who) has_invis = { return (who.items & IT_INVISIBILITY || who.invisible_finished > time); }
+float(entity who) has_quad = { return (who.items & IT_QUAD || who.super_damage_finished > time); }
+float(entity who) has_invuln = { return (who.items & IT_INVULNERABILITY || who.invincible_finished > time); }
+float(entity who) has_biosuit = { return (who.items & IT_SUIT || who.radsuit_finished > time); }
 
 //============================================================================
 
@@ -357,23 +357,23 @@ entity(entity start, .string fld, string match) findunlocked =
 	return head;
 }
 
-entity(entity start) findunlockedtarget =
+entity(entity e, entity start) findunlockedtarget =
 {
 	entity head = world;
-	if (self.target != string_null)
-		head = findunlocked(start, targetname, self.target);
+	if (e.target != string_null)
+		head = findunlocked(start, targetname, e.target);
 	if (head) return head;
 	
-	if (self.target2 != string_null)
-		head = findunlocked(start, targetname, self.target2);
+	if (e.target2 != string_null)
+		head = findunlocked(start, targetname, e.target2);
 	if (head) return head;
 	
-	if (self.target3 != string_null)
-		head = findunlocked(start, targetname, self.target3);
+	if (e.target3 != string_null)
+		head = findunlocked(start, targetname, e.target3);
 	if (head) return head;
 	
-	if (self.target4 != string_null)
-		return findunlocked(start, targetname, self.target4);
+	if (e.target4 != string_null)
+		return findunlocked(start, targetname, e.target4);
 	return world;
 }
 
@@ -427,6 +427,12 @@ void(string s) precache_model3	= { return; }
 void(string s) precache_sound3	= { return; }
 */
 
+float(entity e) localtime =
+{
+	if (e.solid == SOLID_BSP || e.movetype == MOVETYPE_PUSH)
+		return e.ltime;
+	return time;
+}
 
 // shorthand for turning -1 to 0 for keyvalues for which 0 is a valid non-default selection
 float(float in) zeroconvert =
@@ -739,4 +745,111 @@ void stuffcmd_float( entity client, float f) =
 	decpart = mod( f, 1);
 	decpart = decpart * 10000;
 	stuffcmd_int( client, decpart, 10000);
+}
+
+
+
+
+/*
+===============
+dprint_float stuff
+
+bc i'm tired of ftos cutting off all the important digits
+===============
+*/
+void dprint_digit( float f) =
+{
+	float d;
+	d = floor(f);
+	d = mod(d, 10);
+
+	if(d == 0)		dprint("0");
+	else if(d == 1)	dprint("1");
+	else if(d == 2)	dprint("2");
+	else if(d == 3)	dprint("3");
+	else if(d == 4)	dprint("4");
+	else if(d == 5)	dprint("5");
+	else if(d == 6)	dprint("6");
+	else if(d == 7)	dprint("7");
+	else if(d == 8)	dprint("8");
+	else if(d == 9)	dprint("9");	
+}
+
+void dprint_int( float f, float numdigits) =
+{
+	float tmp;
+	
+	if(f == 0)
+	{
+		dprint("0");
+		return;
+	}
+
+	if(f < 0)
+	{
+		dprint("-");
+		f = fabs(f);
+	}
+	
+	if(numdigits <= 0)
+	{
+		tmp = f;
+		numdigits = 1;
+		while(tmp >= 1){
+			tmp = tmp / 10;
+			numdigits = numdigits * 10;
+		}
+	}
+	
+	while( numdigits > 1 )
+	{
+		numdigits = numdigits / 10;
+		tmp = f / numdigits;
+		dprint_digit( tmp );
+	}
+}
+
+void dprint_float( float f) =
+{
+	float intpart, decpart, isNegative;
+	
+	isNegative = FALSE;
+	
+	if(f == 0)
+	{
+		dprint( "0");
+		return;
+	}
+	
+	if(f < 0)
+	{
+		// easier this way
+		isNegative = TRUE;
+		f = fabs(f);
+	}	
+	
+	// 1: stuff the integer part.
+	intpart = floor(f);
+	if(isNegative) 
+		dprint( "-");
+	dprint_int( intpart, 0);
+	
+	// 2: stuff the decimal point.
+	dprint(".");
+	
+	// 3: stuff the decimal part.
+	decpart = mod( f, 1);
+	decpart = decpart * 10000;
+	dprint_int(decpart, 10000);
+}
+
+void dprint_vector(vector v) =
+{
+	dprint("( ");
+	dprint_float(v_x);
+	dprint(" ");
+	dprint_float(v_y);
+	dprint(" ");
+	dprint_float(v_z);
+	dprint(" )");
 }

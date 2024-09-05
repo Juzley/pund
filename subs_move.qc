@@ -44,6 +44,7 @@ void() SetMovedir =
 	self.angles = t_angle;
 }
 
+// ================================================================
 
 /*
 =============
@@ -72,15 +73,10 @@ void(vector tdest, float tspeed, void() func) SUB_CalcMove =
 {
 	vector	vdestdelta;
 	float	len, traveltime;
-	float	chron;
+	float	chron = localtime(self);
 
 	if (!tspeed)
 		objerror( "No speed is defined!" );
-
-	if (self.solid == SOLID_BSP || self.movetype == MOVETYPE_PUSH)
-		chron = self.ltime;
-	else
-		chron = time;
 
 	self.think1 = func;
 	self.finaldest = tdest;
@@ -130,6 +126,109 @@ void(entity ent, vector tdest, float tspeed, void() func) SUB_CalcMoveEnt =
 	SUB_CalcMove (tdest, tspeed, func);
 	self = stemp;
 }
+
+
+// ================================================================
+
+void() shadowmonitor_think =
+{
+	float frac;
+	entity o = self.owner;
+	
+	frac = vlen(o.origin - self.pos2) / vlen(self.pos2 - self.pos1);
+	if (self.customflags & CFL_INVLIGHT)
+		frac = 1 - frac;
+	bmodel_lightstyle(o, frac);
+	
+	self.nextthink = time + min(0.05, (o.nextthink - localtime(o)));
+
+	// remove last so we don't miss a final eval
+	if (self.nextthink <= time || 
+		localtime(o) > self.lifetime_finished || 
+		self.state != o.state)
+		remove(self);
+}
+
+// move while blending lightstyles smoothly over the distance traveled
+
+// to avoid damaging existing movement logic with extra thinks, we wrap
+// it and create a helper entity to do this instead
+void(vector tstart, vector tdest, float tspeed, void() endfn, float invert) SUB_CalcMoveLight =
+{
+	if (self.style || self.switchshadstyle)
+	{
+		entity mon = spawn();
+		mon.classname = "shadowmonitor";
+		mon.owner = self;
+		mon.state = self.state;	// removes self if these stop matching
+		mon.lifetime_finished = localtime(self) + vlen(tdest - self.origin) / tspeed;
+		mon.think = shadowmonitor_think;
+		mon.nextthink = time;
+		mon.pos1 = tstart;
+		mon.pos2 = tdest;
+		if (invert)
+			mon.customflags |= CFL_INVLIGHT;
+	}	
+	SUB_CalcMove(tdest, tspeed, endfn);
+}
+
+
+// ================================================================
+
+/*
+CURVACEOUS MOVE
+
+pathcorners can have a curve spawnflag that marks them as bezier control points
+bezier path corners affect the curve but will never be visited
+	this means they don't affect speed, don't fire targets, etc
+*/
+
+void() SUB_CalcMoveCurveSeg =
+{
+	float chron = localtime(self);
+	// self.cnt is number of steps we've passed through
+	// (when self.cnt == nodeCtrl.count we should be at nodeEnd)
+	if (self.cnt == self.count)
+	{
+		self.pos2 = VEC_ORIGIN;
+		SUB_CalcMoveDone();
+		return;
+	}
+	self.cnt += 1;
+	
+	float t = self.cnt / self.count;
+	vector destdelta = bez(self.pos1, self.pos2, self.finaldest, t) - self.origin;
+	
+	float wishspeed = lerp(self.speed, self.speed2, t);
+	float traveltime = vlen(destdelta) / wishspeed;
+	if (traveltime < 0.05)
+	{
+		self.velocity = VEC_ORIGIN;
+		self.nextthink = chron + 0.05;
+		self.think = SUB_CalcMoveDone;
+		return;
+	}	
+	self.velocity = destdelta * (1/traveltime);
+	self.think = SUB_CalcMoveCurveSeg;
+	self.nextthink = chron + traveltime;
+}
+
+// init curved motion
+void(vector end, vector ctrl, float segs, float speedStart, float speedEnd, void() fnDone) SUB_CalcMoveCurve =
+{
+	// self.oldenemy is current pathcorner already
+	self.pos1 = self.origin;
+	self.pos2 = ctrl;
+	self.finaldest = end;
+	self.speed = speedStart;
+	self.speed2 = speedEnd;
+	self.cnt = 0;
+	self.count = segs;
+	self.think1 = fnDone;
+	
+	SUB_CalcMoveCurveSeg();
+}
+
 
 
 // ================================================================

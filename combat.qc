@@ -17,7 +17,7 @@ void() killed_monster =
 Killed
 ============
 */
-void(entity targ, entity attacker) Killed =
+void(entity targ, entity attacker, float dmgtype) Killed =
 {
 	local entity oself;
 
@@ -41,7 +41,6 @@ void(entity targ, entity attacker) Killed =
 	}
 
 	// ai_nav
-	//if (self.navtarget) remove(self.navtarget);
 	// clear floaty bullshit on scrags and fish
 	ai_floatmove_start();
 	
@@ -49,13 +48,6 @@ void(entity targ, entity attacker) Killed =
 	self.deadflag = DEAD_DYING;
 	self.takedamage = DAMAGE_NO;
 	self.touch = SUB_Null;
-
-	// bump the monster counter
-	if (self.flags & FL_MONSTER)
-	{
-		killed_monster();
-		monster_death_use();
-	}
 
 	if (coop && attacker.classname == "player")
 	{
@@ -74,11 +66,25 @@ void(entity targ, entity attacker) Killed =
 	}
 	else
 		self.th_die ();
+
+	// call this after th_die in case the monster wants to do anything in die() first
+	// nightmare zombies unflag themselves as MONSTER if they've been killed and res'd
+	if (self.flags & FL_MONSTER)
+	{
+		// fall to ground
+		if (self.flags & FL_FLY)
+			self.flags = self.flags - FL_FLY;
+		if (self.flags & FL_SWIM)
+			self.flags = self.flags - FL_SWIM;
+
+		killed_monster();	// bump the monster counter
+		monster_death_use();
+	}
+	if (self.classname == "player")
+		ClientObituary(dmgtype);
 	
 	self = oself;
 }
-
-
 
 void(float t) PainFinished =
 {
@@ -94,7 +100,6 @@ Collects multiple small damages into a single damage. Creates a chain of
 entities and stores damage on each one, then applies it one by one and 
 wipes the chain.
 
-
 ==============================================================================
 */
 
@@ -105,7 +110,7 @@ void() ClearMultiDamage =
 	multi_ent = world;
 }
 
-void() ApplyMultiDamage =
+void(float dmgtype = 0) ApplyMultiDamage =
 {
 	local entity head;
 	if (!multi_ent)
@@ -114,7 +119,7 @@ void() ApplyMultiDamage =
 	while (head) {
 		//bprint(ftos(head.multi_dmg));
 		//bprint("\n");
-		T_Damage (head, self, self, head.multi_dmg);
+		T_Damage (head, self, self, head.multi_dmg, dmgtype);
 		head.multi_dmg = 0;
 		head = head.multidmg_chain;
 	}
@@ -164,16 +169,21 @@ void(entity hit, float damage) AddMultiDamage =
 CanDamage
 
 Returns true if the inflictor can directly damage the target.  Used for
-explosions and melee attacks.
+RadiusDamage and melee attacks.
 ============
 */
 float(entity targ, vector srcorg) CanDamage =
 {
-
+	vector corner;
+	float dist;
+	
 	// bmodels need special checking because their origin is 0,0,0
 	if (targ.movetype == MOVETYPE_PUSH)
 	{
-		traceline2(srcorg, 0.5 * (targ.absmin + targ.absmax), self, TRACE_NOMONSTERS);
+		corner = BoundsCenter(targ);
+		if (vlen(srcorg - corner) > 512)
+			return FALSE;	// too far
+		traceline2(srcorg, corner, self, TRACE_NOMONSTERS);
 		if (trace_fraction == 1)
 			return TRUE;
 		if (trace_ent == targ)
@@ -181,13 +191,18 @@ float(entity targ, vector srcorg) CanDamage =
 		return FALSE;
 	}
 	
-	vector corner;
-	
+	dist = vlen(srcorg - targ.origin);
+	if (dist > 512)
+		return FALSE;	// too far
+		
 	// center
 	traceline2(srcorg, targ.origin, self, TRACE_NOMONSTERS);
 	if (trace_fraction == 1)
 		return TRUE;
 	
+	if (dist > 256)
+		return FALSE;	// skip extra traces beyond sensible explosion sizes 
+
 	// lunaran: adapted from maddes fix
 	
 	// do top first, as it's most likely to return a positive
@@ -196,34 +211,36 @@ float(entity targ, vector srcorg) CanDamage =
 	if (trace_fraction == 1)
 		return TRUE;
 	
-	// check proper extents of wider monsters
-	corner = targ.size * 0.5 - '1 1 0';
-	corner_z = 0;
-	traceline2(srcorg, targ.origin + corner, self, TRACE_NOMONSTERS);
-	if (trace_fraction == 1)
-		return TRUE;
-		
-	corner_x *= -1;
-	traceline2(srcorg, targ.origin + corner, self, TRACE_NOMONSTERS);
-	if (trace_fraction == 1)
-		return TRUE;
-		
-	corner_y *= -1;
-	traceline2(srcorg, targ.origin + corner, self, TRACE_NOMONSTERS);
-	if (trace_fraction == 1)
-		return TRUE;
-		
-	corner_x *= -1;
-	traceline2(srcorg, targ.origin + corner, self, TRACE_NOMONSTERS);
-	if (trace_fraction == 1)
-		return TRUE;
-
 	// bottom
 	corner = Vector(0,0,targ.mins_z);
 	traceline2(srcorg, targ.origin + corner, self, TRACE_NOMONSTERS);
 	if (trace_fraction == 1)
 		return TRUE;
 	
+	// check proper extents of wider monsters
+	// skip the more expensive trace for these bc we don't really need to test
+	// through notrace 7 times
+	corner = targ.size * 0.5 - '1 1 0';
+	corner_z = 0;
+	traceline(srcorg, targ.origin + corner, TRUE, self);
+	if (trace_fraction == 1)
+		return TRUE;
+		
+	corner_x *= -1;
+	traceline(srcorg, targ.origin + corner, TRUE, self);
+	if (trace_fraction == 1)
+		return TRUE;
+		
+	corner_y *= -1;
+	traceline(srcorg, targ.origin + corner, TRUE, self);
+	if (trace_fraction == 1)
+		return TRUE;
+		
+	corner_x *= -1;
+	traceline(srcorg, targ.origin + corner, TRUE, self);
+	if (trace_fraction == 1)
+		return TRUE;
+
 	return FALSE;
 }
 
@@ -256,21 +273,19 @@ is separate from T_Damage and duplicates a few checks so that func_voids can che
 	if they would kill the player before they actually try
 ============
 */
-float ArmorSave(entity targ, float damage)
+float ArmorSave(entity targ, float damage, float dmgtype = 0)
 {
 	if (!damage) return 0;
 	if (!targ.takedamage)
+		return 0;
+	// armor doesn't protect against things like drowning or target_items health adjustments
+	if (dmgtype & DMGTYPE_NOARMOR || targ.armorvalue <= 0)
 		return 0;
 	if (targ.flags & FL_GODMODE || has_invuln(targ) )
 		return 0;
 
 	float save, savefrac;
-		
-	if (targ.deathtype == "drowning" ||	// armor doesn't protect you from drowning
-		targ.deathtype == "noarmor" || // only used by skill trigger health adjustment so far
-		targ.armorvalue <= 0)
-		return 0;
-
+	
 	savefrac = targ.armortype * damage;
 
 	if (targ.classname == "player")
@@ -305,6 +320,15 @@ T_ReactToDamage
 */
 void( entity attacker ) T_ReactToDamage =
 {
+	if (self.flags & FL_MONSTER)
+	{
+		monster_alt_use(
+			(attacker.flags & (FL_MONSTER|FL_CLIENT)), // waketarget if attacker isn't world
+			TRUE, 	// pain target obviously
+			(self.health <= floor(self.max_health * 0.5)), // half health threshold
+			FALSE);	// not dead yet
+	}
+	
 	// ignore doors and nailshooters and so on
 	if (!(attacker.flags & (FL_MONSTER|FL_CLIENT))) return;
 	// ignore self dmg
@@ -314,7 +338,7 @@ void( entity attacker ) T_ReactToDamage =
 	// don't get distracted instantly after switching targets
 	if (time < self.dmgtime) return;
 
-	if (attacker == self.enemy)
+	if (attacker == self.enemy && (attacker.flags & FL_MONSTER))
 	{
 		self.frags = 0;	// .frags used on monsters as a 'give up on infighting' timer
 		return;
@@ -367,20 +391,20 @@ now wrapped around T_DamageApply so that zapped/axe flags always get cleared
 even if the target resisted the damage
 ============
 */
-void(entity targ, entity inflictor, entity attacker, float damage) T_Damage =
+void(entity targ, entity inflictor, entity attacker, float damage, float dmgtype = 0) T_Damage =
 {
-	T_DamageApply(targ,inflictor,attacker,damage);
+	T_DamageApply(targ, inflictor, attacker, damage, dmgtype);
 	targ.customflags = not(targ.customflags, CFL_AXEHITME | CFL_ZAPPED);
 }
 
-void(entity targ, entity inflictor, entity attacker, float damage) T_DamageApply =
+void(entity targ, entity inflictor, entity attacker, float damage, float dmgtype = 0) T_DamageApply =
 {
 	vector	dir;
 	entity	oldself;
 	float	save, take;
 
 	if (!damage || !targ.takedamage) return;
-		
+	
 	if (targ == attacker)
 	{
 		// monsters which shouldn't be able to splash damage themselves to death:
@@ -393,7 +417,7 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_DamageApply
 	// used by buttons and triggers to set activator for target firing
 	damage_attacker = attacker;
 
-	if (has_quad(attacker))
+	if (has_quad(attacker) && !(dmgtype & DMGTYPE_SCRIPT))	// don't let target_items quad-damage you
 	{
 		damage = damage * 4;
 		
@@ -406,6 +430,23 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_DamageApply
 			damage -= 3;
 	}
 	
+	// variety is the spice of life:
+	// scrags will happily fly down into slime, and they do spit green shit anyway
+	if (targ.classname == "monster_wizard" && (dmgtype & DMGTYPE_SLIME))
+		return;
+	// shamblers take half damage from explosives
+	else if (targ.classname == "monster_shambler" && (dmgtype & DMGTYPE_EXPLOSION))
+		damage = damage * 0.5;
+	// some attacks like vorepods and ogre grenades should explode zombies despite doing <60dmg
+	else if (targ.type == "zombie")
+	{
+		if (dmgtype & DMGTYPE_MELEE)	// always knock a zombie down at least
+			damage = max(damage, 20);
+		else if (dmgtype & (DMGTYPE_ZKILL | DMGTYPE_LAVA))
+			damage = max(damage, targ.health + 25);
+		else if (dmgtype & DMGTYPE_SLIME)
+			return;	// slime damage is not meaningful to zombies, they'll just pain over and over
+	}		
 	
 	if (attacker.classname == targ.classname)
 	{
@@ -443,22 +484,24 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_DamageApply
 	}
 
 	// team play damage avoidance
-	if ( (teamplay == 1) && 
-		(targ.team > 0) && 
-		(targ.team == attacker.team) && 
-		(targ != attacker) && 
-		(attacker.classname == "player") && 
-		(inflictor.classname != "door") )	// because squishing a teammate is still possible
-		return;
+	if (teamplay && attacker.classname == "player")
+	{
+		if ((targ.team > 0) && 
+			(targ.team == attacker.team) && 
+			(targ != attacker) && 
+			(inflictor.classname != "door") )	// because squishing a teammate is still possible
+			return;
 
-	// teamplay is automatically damage avoidance in coop because friends are always a team
-	if (teamplay && coop && 
-		attacker.classname == "player" && targ.classname == "player" &&
-		attacker != targ)
-		return;
+		// teamplay is automatically damage avoidance in coop because friends are always a team
+		if (coop && 
+			targ.classname == "player" &&
+			attacker != targ)
+			return;
+	}
 
 	// ready to do the damage
-	save = ArmorSave(targ, damage);
+	damage = max(1, floor(damage));
+	save = ArmorSave(targ, damage, dmgtype);
 	targ.armorvalue = targ.armorvalue - save;
 	if (targ.classname == "player")
 		armor_set_type(targ);
@@ -484,7 +527,7 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_DamageApply
 	
 	if (targ.health <= 0)
 	{
-		Killed (targ, attacker);
+		Killed (targ, attacker, dmgtype);
 		return;
 	}
 
@@ -516,118 +559,53 @@ void(entity targ, entity inflictor, entity attacker, float damage) T_DamageApply
 
 /*
 ============
-T_DamageMelee
-============
-*/
-void(entity targ, entity attacker, float damage) T_DamageMelee =
-{
-	// always do at least a damage
-	T_Damage(targ, attacker, attacker, max(1, floor(damage)));
-}
-
-/*
-============
 T_RadiusDamage
 ============
 */
-void(entity inflictor, entity attacker, entity tgt, float points, float multi) T_RadiusDamageCheck =
+void(entity inflictor, entity attacker, float damage, entity ignore, float dmgtype = DMGTYPE_EXPLOSION) T_RadiusDamage =
 {
-	local float pnts;
-	pnts = points;
-	if ( !CanDamage ( tgt, inflictor.origin ) )
-		return;
+	// note: find downed zombies to gib first, then do radius damage, or else the radius 
+	// damage will knock far away zombies down, then immediately gib them too
+	if ((dmgtype & DMGTYPE_EXPLOSION) && damage > 48)
+		T_GibDownedZombies(inflictor.origin, damage);
 	
-	// shambler takes half damage from all explosions
-	if (tgt.classname == "monster_shambler") pnts *= 0.5;
-	
-	
-	if (multi && tgt.movetype != MOVETYPE_WALK )
-		AddMultiDamage( tgt, pnts );
-	else T_Damage (tgt, inflictor, attacker, pnts);
-}
-
-
-void(entity inflictor, entity attacker, float damage, entity ignore, float multi) T_RadiusMultiDamage =
-{
 	float 	points, dist;
 	entity	head;
-	vector	org;
 	
-	head = findradius(inflictor.origin, damage+40);
+	head = findradius(inflictor.origin, min(512, damage + 40));
 	
 	while (head)
 	{
 		if (head != ignore && head.takedamage)
 		{
-			org = head.origin + (head.mins + head.maxs)*0.5;
-			dist = vlen (inflictor.origin - org);
-			points = damage - (0.5 * dist);
-			if (head == attacker)
-				points = points * 0.5;
-			
 			// don't set off shootable doors/buttons with splash unless the player means it
 			if ((head.movetype == MOVETYPE_PUSH || head.th_die == multi_killed) && head.type != "explobox")
 			{
+				dist = vlen (inflictor.origin - BoundsCenter(head));
 				// a grenade at rest touching shootable should intuitively trigger it
 				if ( !(inflictor.type == "grenade" && BoundsTouching(inflictor.origin, inflictor.origin, head.absmin, head.absmax, 2)) )
 					if (dist > damage / 3)
 						points = 0;
 			}
-
-			points = max(0, points);	//clamp
-			if (points > 0)
-				T_RadiusDamageCheck(inflictor, attacker, head, points, multi);
-		}
-		head = head.chain;
-	}
-}
-
-void(entity inflictor, entity attacker, float damage, entity ignore) T_RadiusDamage =
-{
-	// note: find downed zombies to gib first, then do radius damage, or else the radius 
-	// damage will knock far away zombies down, then immediately gib them too
-	T_GibDownedZombies(inflictor.origin, damage);
-	
-	T_RadiusMultiDamage(inflictor, attacker, damage, ignore, 0);
-}
-
-
-
-/*
-============
-T_BeamDamage
-... unused
-============
-*/
-void(entity attacker, float damage) T_BeamDamage =
-{
-	local	float 	points;
-	local	entity	head;
-	
-	head = findradius(attacker.origin, damage+40);
-	
-	while (head)
-	{
-		if (head.takedamage)
-		{
-			points = 0.5*vlen (attacker.origin - head.origin);
-			if (points < 0)
-				points = 0;
-			points = damage - points;
-			if (head == attacker)
-				points = points * 0.5;
-			if (points > 0)
+			else
 			{
-				if (CanDamage (head, attacker.origin))
-				{
-					T_Damage (head, attacker, attacker, points);
-				}
+				dist = vlen (inflictor.origin - head.origin);
+				points = damage - (0.5 * dist);
+				if (head == attacker)
+					points *= 0.5;
 			}
+			// shambler takes half damage from all explosions
+			//if (head.classname == "monster_shambler" && (dmgtype & DMGTYPE_EXPLOSION))
+			//	points *= 0.5;
+			// already halved by T_Damage
+			
+
+			if (points > 0 && CanDamage ( head, inflictor.origin ) )
+				T_Damage (head, inflictor, attacker, points, dmgtype);
 		}
 		head = head.chain;
 	}
 }
-
 
 /*
 ============

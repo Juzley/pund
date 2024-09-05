@@ -26,26 +26,30 @@ vector(float dm) GibVelocityForHealth =
 	return v * voom;
 }
 
-void(entity gib, string gibname) MakeGib =
+entity(string gibname, vector vel) ThrowGib =
 {
-	gib.lifetime_finished = time + 8 + random() * 8;
+	entity gib;
+	gib = spawn();
+	
+	// gibs have to be thinking ballistic projectiles to pass through monsterclip/notrace
+	gib.owner = gib.trueowner = self;
+	gib.touch = projectile_touch_null;
 	gib.th_die = SUB_Remove;
-	
-	SUB_ChangeModel(gib, gibname);
-	gib.type = "gib";
+	gib.think = projectile_toss_think;
+	gib.nextthink = time;
+	gib.touch = projectile_touch_null;
+	gib.lifetime_finished = time + 6 + random() * 6;
+
+	setmodel(gib, gibname);
+	setsize (gib, VEC_ORIGIN, VEC_ORIGIN);
+	setorigin (gib, self.origin);
+
+	gib.velocity = gib.oldvelocity = vel;	
 	gib.avelocity = Vector(random(),random(),random()) * 600;
+
+	gib.movetype = MOVETYPE_BOUNCE;
 	
-	gib.frame = 0;
-	gib.flags = 0;
-}
-
-entity(string gibname, float dm) ThrowGib =
-{
-	local entity gib;
-
-	// gibs have to be thinking ballistic projectiles to pass through monsterclip/notrace :(
-	gib = toss_projectile(self.origin, GibVelocityForHealth(dm), "gib");
-	MakeGib(gib, gibname);
+	gib.type = "gib";
 	
 	return gib;
 }
@@ -54,7 +58,9 @@ void(string gibname, float dm) ThrowHead =
 {
 	setmodel (self, gibname);
 	self.frame = 0;
-	self.nextthink = -1;
+	self.think = SUB_Null;
+	self.nextthink = 0;
+	
 	self.movetype = MOVETYPE_BOUNCE;
 	self.takedamage = DAMAGE_NO;
 	self.solid = SOLID_NOT;
@@ -68,28 +74,25 @@ void(string gibname, float dm) ThrowHead =
 }
 
 
-// Gib & GibSpray are split up since some monsters play special gib sounds (zombies/players) and
-// I want all monsters going through GibSpray for trigger_void tests
+// Gib & GibSpray are split up since some monsters play special gib sounds (zombies/players)
 void(string headmdl, float dm) GibSpray =
 {
-	ThrowGib ("progs/gib1.mdl", dm);
-	ThrowGib ("progs/gib2.mdl", dm);
-	ThrowGib ("progs/gib3.mdl", dm);
+	ThrowGib ("progs/gib1.mdl", GibVelocityForHealth(dm));
+	ThrowGib ("progs/gib2.mdl", GibVelocityForHealth(dm));
+	ThrowGib ("progs/gib3.mdl", GibVelocityForHealth(dm));
 	
-	if (self.classname != "player")
-		if (damage_attacker.classname == "trigger_void" || damage_attacker.classname == "func_void" )
-		{
-			SUB_Remove();
-			return;
-		}
-
+	if (self.classname != "player" && damage_attacker.classname == "func_void" )
+	{
+		SUB_Remove();
+		return;
+	}
 		
 	ThrowHead (headmdl, dm);
 }
 
 void(string headmdl, float dm) Gib =
 {
-		sound (self, CHAN_VOICE, "player/udeath.wav", 1, ATTN_NORM);
+	sound (self, CHAN_VOICE, "player/udeath.wav", 1, ATTN_NORM);
 	
 	GibSpray(headmdl, dm);
 }
@@ -155,8 +158,8 @@ void(string gibname) target_meat_fireworks_do =
 	spray_z = spray_z * crandom() + self.mangle_z * 4;
 	spray *= self.speed * 2;
 	
-	gib = toss_projectile(self.origin, spray, "gib");
-	MakeGib(gib, gibname);
+	gib = ThrowGib(gibname, spray);
+	setorigin(gib, self.origin + self.pos1);
 }
 
 void() target_meat_fireworks_go =
@@ -165,6 +168,10 @@ void() target_meat_fireworks_go =
 	float i;
 	meat_noise();
 	
+	self.pos1_x = (random()-0.5) * self.size_x;
+	self.pos1_y = (random()-0.5) * self.size_y;
+	self.pos1_z = (random()-0.5) * self.size_z;
+
 	for (i = 0; i < 3; i++)
 	{
 		spray = '1 1 1' - self.mangle;
@@ -172,12 +179,20 @@ void() target_meat_fireworks_go =
 		spray_y *= crandom();
 		spray_z *= crandom();
 		spray += self.mangle * 0.5;
-		SpawnMeatSpray(self.origin, spray * self.speed);
+		SpawnMeatSpray(self.origin + self.pos1, spray * self.speed);
 	}
 	
-	target_meat_fireworks_do("progs/gib1.mdl");
-	target_meat_fireworks_do("progs/gib2.mdl");
-	target_meat_fireworks_do("progs/gib3.mdl");
+	target_meat_fireworks_do(self.model);
+	
+	if (self.cnt == 2)
+		target_meat_fireworks_do(self.model2);
+	else
+		target_meat_fireworks_do(self.model);
+		
+	if (self.cnt == 3)
+		target_meat_fireworks_do(self.model3);
+	else
+		target_meat_fireworks_do(self.model);
 }
 
 void() target_meat_fireworks_use =
@@ -200,6 +215,7 @@ void() target_meat_fireworks_use =
 		meats.think = target_meat_fireworks_go;
 		meats.mangle = self.mangle;
 		meats.speed = self.speed;
+		meats.size = self.size;
 		meats.nextthink = time + tnext;
 		tnext += self.wait + self.rand * random();
 	}
@@ -215,6 +231,7 @@ Keys
 "rand" max random additional to wait before meat
 "speed" speed of meat
 "mangle" override meat direction, defaults to up
+"size" random location of bursts within bounds of this size
 */
 /*FGD
 @PointClass base(Appearflags, Targetname) size(32 32 32) color(180 0 50) = target_meat_fireworks : "trigger for meat"
@@ -223,6 +240,7 @@ Keys
 	delay(string) : "Delay before first meat" : "0"
 	wait(string) : "Wait between meat" : "1"
 	rand(string) : "Random extra wait before meat" : "0"
+	size(string) : "Random location within bounds" : "0 0 0"
 	speed(integer) : "Speed of meat" : 128
 	mangle(string) : "Override meat vector" : "0 0 1"
 ]
@@ -243,6 +261,29 @@ void() target_meat_fireworks =
 	else
 	{
 		self.mangle = normalize(self.mangle);
+	}
+	
+	if (self.model != string_null)
+	{
+		precache_model(self.model);
+		self.cnt = 1;
+		if (self.model2 != string_null)
+		{
+			precache_model(self.model2);
+			self.cnt = 2;
+			if (self.model3 != string_null)
+			{
+				precache_model(self.model3);
+				self.cnt = 3;
+			}
+		}
+	}
+	else
+	{
+		self.cnt = 3;
+		self.model = "progs/gib1.mdl";
+		self.model2 = "progs/gib2.mdl";
+		self.model3 = "progs/gib3.mdl";
 	}
 }
 

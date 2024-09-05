@@ -397,7 +397,6 @@ Keys:
 		262144	: "Bit 19" : 0
 		524288	: "Bit 20" : 0
 		1048576	: "Bit 21" : 0
-		2097152	: "Bit 22" : 0
 	]
 ]
 
@@ -419,8 +418,6 @@ Keys:
 void() item_sigil =
 {
 	if (!SUB_ShouldSpawn()) return;
-	if (!(self.spawnflags & 15) && !self.svflags)
-		objerror("no flag set for item_sigil");
 
 	if (!self.noise)
 		self.noise = "misc/runekey.wav";
@@ -464,7 +461,10 @@ void() item_sigil =
 		precache_model2_safe(self.model);
 		setmodel(self, self.model);
 		if (!self.svflags)
+		{
+			dprint("\bwarning:\b no serverflag or episode set for item_sigil");
 			self.svflags = 16;
+		}
 	}
 	
 	if (self.message == string_null)

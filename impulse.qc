@@ -45,10 +45,9 @@ void() Cheat_Items =
 
 	self.items = self.items | IT_LIGHTNING;
 
-	self.weapon = IT_ROCKET_LAUNCHER;
+	W_Select(IT_ROCKET_LAUNCHER);
 
 	stuffcmd(self,"bf\n");
-	W_ResetWeaponState();
 }
 
 // --------------------------------
@@ -84,7 +83,7 @@ void() Cheat_Genocide =
 			if (t.think == mon_spawner_tryspawn || t.modelindex == 0 || t.classname == string_null )
 				remove(t);
 			else
-				T_Damage(t, self, self, t.health);		// waurgh
+				T_Damage(t, self, self, t.health, DMGTYPE_SCRIPT);		// waurgh
 		}
 		t = nextent(t);
 	}
@@ -171,20 +170,18 @@ void() ServerflagsCommand =
 // --------------------------------
 void() ImpulseCommands =
 {
-	switch(self.impulse)
+	if (!self.impulse) return;
+	
+	if (self.impulse < 9)
 	{
-	case 0:
-		return;
-	case 1:
-	case 2:
-	case 3:
-	case 4:
-	case 5:
-	case 6:
-	case 7:
-	case 8:
 		W_ChangeWeapon();
-		break;
+	}
+	else if (self.impulse >= 20 && self.impulse <= 39)
+	{
+		dev_impulse(self.impulse);
+	}
+	else switch(self.impulse)
+	{
 	case 10:
 		CycleWeaponCommand();
 		break;
@@ -194,24 +191,19 @@ void() ImpulseCommands =
 	case 11:
 		ServerflagsCommand();
 		break;
-/*
-	// ai_nav
-	case 80:
-		nav_toggleEditor();
+	case 13:
+		W_SelectBestShotgun();
 		break;
-	case 81:
-		nav_nodeSizeUp();
+	case 14:
+		W_SelectBestNailgun();
 		break;
-	case 82:
-		nav_nodeSizeDown();
+	case 15:
+		W_SelectBestWeapon();
 		break;
-	case 83:
-		nav_createNode();
+
+	case 40:
+		dev_impulse_list();
 		break;
-	case 84:
-		nav_deleteNode();
-		break;
-	*/
 	case 64:
 		dev_i_cant_see();
 		break;

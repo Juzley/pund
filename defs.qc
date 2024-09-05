@@ -213,6 +213,7 @@ void		end_sys_fields;			// flag for structure dumping
 */
 
 // globals
+#pragma noref 1
 
 float	gameover;		// set when a rule exits
 
@@ -229,11 +230,14 @@ float	framecount;
 float	reset_flag;
 float	startingserverflags;
 nosave float	gamestarted;
-nosave float	cleanUpClientShit;
+nosave float	initCleanup;
 nosave float	clients;
 nosave float	clientsAlive;
+nosave float	clientsAliveMask;
+nosave float	globalStatSupported;
 
 float	skill;
+string	skill_str;	// for preserving skill across death/reloads
 float	coop_time;
 
 // for balancing: total monster HP/ammo -HP/zombies/grenades in the level
@@ -246,7 +250,6 @@ float	trace_debug;
 
 // moved from ai.qc or maybe combat.qc - used for target finding
 float	enemy_vis, enemy_range;//, enemy_infront;
-float	enemy_yaw();
 
 // when a monster becomes angry at a player, that monster will be used
 // as the sight target the next frame so that monsters near that one
@@ -258,13 +261,17 @@ float	sight_entity_time;
 entity	lastspawn, bodyqueue_head;
 
 // moved from client.qc
-float	intermission_running, intermission_exittime;
+float	intermission, intermission_exittime;
 float	modelindex_eyes, modelindex_player;
 
 float	icantsee;
-float	isKex;	// running the quake rerelease
+// these are set in worldspawn() and thus reset every game start
+nosave float	isKex;	// running the quake rerelease
+nosave float	isCSQC;	// running something with passable csqc support
 
 string	keyType;
+
+float *cdtrack;	// fteqcc supports pointers. madness. see void() worldspawn
 
 //================================================
 
@@ -277,10 +284,8 @@ string	keyType;
 .string		target2;
 .string		target3;
 .string		target4;
-//.string		pretarget;		// to be fired before ... things
-//.string		posttarget;		// to be fired after them
 
-.float		alpha;
+.float		alpha, alpha2;
 
 // lights
 .float		style;
@@ -319,10 +324,17 @@ string	keyType;
 .float		healthtime;
 .string		deathtype;		// keeps track of how the player died
 
+#ifndef NO_CSQC
+// fields for csqc HUD stats
+.float		clientdata;
+.float		tint;
+.vector		tint_color;
+#endif
+
 // fog
 .vector		fog_color, fog_color2;
 .float		fog_density, fog_density2;
-
+.float		fog_sky, fog_sky2;
 
 // object stuff
 //.string		mdl;			// only used by items to hide until respawn time
@@ -377,6 +389,7 @@ string	keyType;
 .float		notrace;		// entity will be invisible to traceline2()
 .vector		oldvelocity;	// necessary for getting projectiles to pass through .notrace entities
 .entity		trueowner;		// now this is getting dumb
+.void(float unlock) lock;	// so entities can define their own target_lock cleanup
 
 // OVERLOADS:
 .float rand = healamount;	// for trigger_timer
@@ -387,8 +400,8 @@ string	keyType;
 .float light_lev = bubble_count;	// shuts up a stupid stupid warning
 .vector rmovedir = finaldest;
 .float version = worldtype;
-.float fog_sky = length;
-.float fog_sky2 = width;
+.string	model2 = wad;		// for debris emitter
+.string model3 = map;
 
 
 // water
@@ -528,13 +541,17 @@ void(entity e) setspawnparms		= #78;		// set parm1... to the
 												// for coop respawn
 
 float(string s) checkextension		= #99;		// check cvar("pr_checkextension") before calling
-
+#ifndef NO_CSQC
+void(float num, float type, .__variant fld) clientstat = #232;
+void(float num, float type, string name) globalstat = #233;
+#endif
 //================================================
+
+//	angles(string) : "Direction, specifically (pitch yaw roll)"
 
 /*FGD
 @baseclass = Angle [ 
 	angle(integer) : "Direction (0-360 yaw, or -1 for up/-2 for down)"
-	angles(string) : "Direction, specifically (pitch yaw roll)"
 ]
 @baseclass = Appearflags [
 	spawnflags(Flags) =
@@ -548,7 +565,10 @@ float(string s) checkextension		= #99;		// check cvar("pr_checkextension") befor
 	]
 ]
 
-@baseclass = Targetname [ targetname(target_source) : "Name" ]
+@baseclass = Targetname [ 
+	targetname(target_source) : "Name" 
+	impulse(integer) : "Can activate with this impulse" : 0
+]
 @baseclass = Target [ 
 	target(target_destination) : "Target: activate anything with a matching targetname" 
 	target2(target_destination) : "Target 2: activate anything with a matching targetname" 
@@ -567,4 +587,17 @@ float(string s) checkextension		= #99;		// check cvar("pr_checkextension") befor
 ]
 
 @baseclass base(Phong) color(0 120 180) = Func []
+
+@baseclass = FuncInvis [
+	spawnflags(flags) = [
+		128 : "Start Invisible" : 0
+	]
+]
+@baseclass = AltTarget [
+	spawnflags(flags) = [
+		16384 : "Alt Target Pattern" : 0
+	]
+]
 */
+
+#pragma noref 0

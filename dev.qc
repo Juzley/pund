@@ -116,7 +116,9 @@ void() dev_invoke =
 	{
 		activator = self;
 		
-		if (trace_ent.flags & FL_MONSTER)
+		if (trace_ent.flags & FL_CLIENT)
+			sound (trace_ent, CHAN_VOICE, "player/plyrjmp8.wav", 1, ATTN_NORM);	
+		else if (trace_ent.flags & FL_MONSTER)
 			monster_kill(trace_ent);
 		else if (trace_ent.classname == "func_door")
 			door_force(trace_ent);
@@ -173,6 +175,38 @@ void() dev_trigger =
 	} while ( 1 );
 }
 
+void(float i) dev_impulse =
+{
+	bprint3("dev impulse ", ftos(i), " triggering\n");
+	entity t;
+	activator = self;
+	t = world;
+	do	{
+		t = find(t, classname, "tg_imp");
+		if (t.impulse == i)
+			SUB_CallAsSelf(t.owner.use, t.owner);
+	} while ( t != world );
+}
+
+void() dev_impulse_list =
+{
+	bprint("dev impulses:\n");
+	entity t;
+	t = world;
+	do	{
+		t = find(t, classname, "tg_imp");
+		if (t)
+		{
+			bprint4("  ", ftos(t.impulse), ": ", t.owner.classname);
+			if (t.owner.targetname != string_null)
+				bprint3(", tname: ", t.owner.targetname, "\n");
+			else
+				bprint("\n");
+		}
+	} while ( t != world );
+	bprint("end of list.\n");
+}
+
 void() dev_enemychain =
 {
 	local vector org;
@@ -206,7 +240,9 @@ void() dev_remaining_monsters
 		mon = nextent(mon);
 		if (mon.flags & FL_MONSTER)
 		{
-			if (mon.health <= 0 || mon.deadflag) continue;
+			if (mon.health <= 0 || mon.deadflag || 
+				(mon.type == "zombie" && mon.customflags & CFL_RETURNED)) // no returned zombies on nightmare
+				continue;
 			bprint4(mon.classname, " at ", vtos(mon.origin), "\n");
 		}
 		else if (mon.customflags & CFL_SPAWNER)
@@ -229,7 +265,7 @@ void() dev_i_cant_see =
 	else
 		lightstyle(0, "z");
 	icantsee = !icantsee;
-	cleanUpClientShit = 2;
+	initCleanup = 2;
 }
 
 

@@ -8,6 +8,15 @@
 
 void() GotoNextMap =
 {
+	// tell the csqc hud to clear the intermission stuff
+	// or else it draws over the LOADING bar :(
+	entity e = nextent(world);
+	while (e.flags & FL_CLIENT)
+	{
+		e.clientdata = -1;
+		e = nextent(e);
+	}
+	
 	if (cvar("samelevel"))	// if samelevel is set, stay on same level
 		changelevel (mapname);	// name of current level
 	else
@@ -24,13 +33,13 @@ void() ExitIntermission =
 		return;
 	}
 	
-	if (!intermission_running) return;
+	if (!intermission) return;
 	
 	intermission_exittime = time + 1;
-	intermission_running = intermission_running + 1;
+	intermission = intermission + 1;
 
 	// end of episode drivel
-	if (intermission_running == 2)
+	if (intermission == 2)
 	{
 		WriteByte (MSG_ALL, SVC_CDTRACK);
 		WriteByte (MSG_ALL, 2);
@@ -77,7 +86,7 @@ void() ExitIntermission =
 		GotoNextMap();
 	}
 	
-	if (intermission_running == 3)
+	if (intermission == 3)
 	{
 		if (!cvar("registered"))
 		{	// shareware episode has been completed, go to sell screen
@@ -94,18 +103,17 @@ void() ExitIntermission =
 		GotoNextMap();
 	}
 	
-	if (intermission_running == 4)
+	if (intermission == 4)
 	{
 		GotoNextMap();
 	}
 		
-	if (intermission_running >= 5)
+	if (intermission >= 5)
 	{
 		GotoNextMap();
 		return;
 	}
 
-		
 	dprint("fell off the end of exitintermission\n");
 	return;
 }
@@ -318,7 +326,7 @@ void() move_players_to_intermission =
 
 void() execute_changelevel =
 {
-	intermission_running = 1;
+	intermission = 1;
 	
 // enforce a wait time before allowing changelevel
 	if (deathmatch)

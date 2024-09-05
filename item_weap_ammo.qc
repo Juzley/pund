@@ -81,14 +81,10 @@ void() weapon_touch =
 
 	weapon_give(other);
 	// change to the weapon
-	entity	stemp;
-	stemp = self;
-	self = other;
 	if (nsw)
-		W_ResetWeaponState();
+		SUB_CallAsSelf(W_ResetWeaponState, other);
 	else
-		W_BetterWeapon(stemp.items);
-	self = stemp;
+		W_BetterWeapon(other, self.items);
 
 	if (coop == 1)
 	{
@@ -303,6 +299,28 @@ void() weapon_lightning =
 	StartWeapon();
 }
 
+/*QUAKED weapon_axe (0 0 1) (-16 -16 0) (16 16 56) ? ? SUSPENDED
+The axe, should you happen to make the player start without one.
+
+Keys:
+"target/2/3/4/k" - entity to trigger when picked up
+"targetname" - will not spawn until triggered
+"wait" - will respawn after 'wait' seconds. fires targets every time.
+"count" - limit number of times to respawn
+*/
+/*FGD
+@PointClass base(Weapon) model({ "path": ":progs/g_axe.mdl" }) = weapon_axe : "Axe." []
+*/
+void() weapon_axe =
+{
+	if (!SUB_ShouldSpawn()) return;
+	precache_model_safe ("progs/g_axe.mdl");
+	setmodel (self, "progs/g_axe.mdl");
+	self.items = IT_AXE;
+	self.netname = "Axe. Find some wood!";
+	StartWeapon();
+}
+
 
 // ===============================================================================
 
@@ -351,9 +369,12 @@ void() ammo_touch =
 	sound (other, CHAN_ITEM, "weapons/lock4.wav", 1, ATTN_NORM);
 	stuffcmd (other, "bf\n");
 
-	// if changed current ammo, update it
-	SUB_CallAsSelf(W_SetCurrentAmmo, other);
-
+	if (!self.weapon)
+		SUB_CallAsSelf(W_SelectBestWeapon, other);
+	else
+		// if changed current ammo, update it	
+		SUB_CallAsSelf(W_SetCurrentAmmo, other);
+	
 	ItemTouched();
 }
 

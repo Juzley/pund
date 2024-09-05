@@ -97,11 +97,20 @@ void() tbaby_run25	=[	$run25,		tbaby_run1	] {ai_run(1);}
 
 float(entity e) tar_visible =
 {
-	return (visible(e) && !has_invis(e));
+	return (alive(e) && visible(e) && !has_invis(e));
+}
+
+float() Tar_Max =
+{
+	if (skill == 0) return 3;
+	if (skill == 3) return 7;
+	return 5;
 }
 
 void() Tar_Forget =
 {
+	self.customflags |= CFL_OMNIVISION;	// gain 360 vision in case we fall asleep in a corner
+
 	if (!self.rad_time)	// time to be RAD
 	{
 		// we just woke up, don't forget right away, because if we were awoken
@@ -145,13 +154,13 @@ void()	Tar_JumpTouchGround =
 	}
 
 	self.touch = SUB_Null;
-	if (self.cnt > 4 && (!tar_visible(self.enemy)))
+	if (self.cnt > Tar_Max() && (!tar_visible(self.enemy)))
 	{
 		self.think = tbaby_run1;
 		self.cnt = 0;
 		// if the player listens to sound cues and ambushes the spawn just as it 
-		// stops, he has a full second to attack it
-		ai_attack_finished(1);	
+		// stops, he has an extra second to attack it (... outside of nightmare)
+		if (skill < 3) ai_attack_finished(1);	
 	}
 	else
 	{
@@ -203,10 +212,10 @@ void()	tbaby_fly4		=[	$fly4,	tbaby_fly1	]
 	}
 }
 
-void()	tbaby_jump1		=[	$jump1,	tbaby_jump2		] {ai_face();}
-void()	tbaby_jump2		=[	$jump2,	tbaby_jump3		] {ai_face();}
-void()	tbaby_jump3		=[	$jump3,	tbaby_jump4		] {ai_face();}
-void()	tbaby_jump4		=[	$jump4,	tbaby_jump5		] {ai_face();}
+void()	tbaby_jump1		=[	$jump1,	tbaby_jump2		] {nmfast(); ai_face();}
+void()	tbaby_jump2		=[	$jump2,	tbaby_jump3		] {nmfast(); ai_face();}
+void()	tbaby_jump3		=[	$jump3,	tbaby_jump4		] {nmfast(); ai_face();}
+void()	tbaby_jump4		=[	$jump4,	tbaby_jump5		] {nmfast(); ai_face();}
 void()	tbaby_jump5		=[	$jump5,	tbaby_jump6		]
 {	
 	self.movetype = MOVETYPE_BOUNCE;
@@ -238,7 +247,7 @@ void(entity attacker, float damage) tbaby_pain =
 	if (has_invis(attacker) && self.pain_finished < time)
 	{
 		self.pain_finished = time + 1;
-		self.cnt = 4;
+		self.cnt = Tar_Max();
 		tbaby_jump1();
 		return;
 	}
@@ -251,7 +260,7 @@ self.takedamage = DAMAGE_NO;
 }
 void()	tbaby_die2	=[	$exp,		tbaby_run1	] 
 {
-	T_RadiusDamage (self, self, 120, world);
+	T_RadiusDamage (self, self, 120, world, DMGTYPE_EXPLOSION );
 	sound (self, CHAN_VOICE, "blob/death1.wav", 1, ATTN_NORM);
 	BecomeTarExplosion ();
 }
@@ -284,7 +293,7 @@ float() tbaby_check_attack =
 
 	if (random() < chance)
 	{
-		self.th_missile ();
+		self.attack_state = AS_MISSILE;
 		ai_attack_finished (2*random());
 		return TRUE;
 	}

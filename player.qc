@@ -437,9 +437,9 @@ void() GibPlayer =
 
 	if (damage_attacker.classname == "trigger_void" || damage_attacker.classname == "func_void" )
 	{
-		sound (self, CHAN_VOICE, "player/splat1.wav", 1, ATTN_NONE);
-		//stuffcmd( self, "\nv_cshift 16 0 0 255\n");
-		csf_set(self, 255, '16 0 0',70);
+		sound (self, CHAN_VOICE, damage_attacker.owner.noise2, 1, ATTN_NONE);
+		//TintScreenColor(self, 255, '32 0 0');
+		csf_set(self, 255, '32 0 0',70);
 		return;
 	}
 	
@@ -477,7 +477,6 @@ void() PlayerDie =
 
 	clientsAlive -= 1;
 
-	ClientObituary();	// moved from Killed() so it doesn't get called when non-players die
 	set_respawn_delay();	// coop 1 respawn lockout
 	
 	if ((deathmatch || coop) && mapname != "start")

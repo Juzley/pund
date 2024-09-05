@@ -30,7 +30,7 @@ THINK FUNCTIONS
 
 void() door_blocked =
 {
-	T_Damage (other, self, self, self.dmg);
+	T_Damage (other, self, self, self.dmg, DMGTYPE_CRUSH);
 	
 	// if a door has a negative wait, it would never come back if blocked,
 	// so let it just squash the object to death real fast
@@ -48,10 +48,12 @@ void() door_hit_top =
 {
 	sound (self, CHAN_VOICE, self.noise1, 1, ATTN_NORM);
 	self.state = STATE_TOP;
+	SUB_UseTargetsAlt(target2);
 	if (self.spawnflags & DOOR_TOGGLE)
 		return;		// don't come down automatically
 	self.think = door_go_down;
 	self.nextthink = self.ltime + self.wait;
+	
 }
 
 void() door_hit_bottom =
@@ -59,10 +61,13 @@ void() door_hit_bottom =
 	sound (self, CHAN_VOICE, self.noise1, 1, ATTN_NORM);
 	self.frame = self.skin;
 	self.state = STATE_BOTTOM;
+	
+	SUB_UseTargetsAlt(target4);
 }
 
 void() door_go_down =
 {
+	//dprint("door_go_down\n");
 	sound (self, CHAN_VOICE, self.noise2, 1, ATTN_NORM);
 	if (self.max_health)
 	{
@@ -71,11 +76,14 @@ void() door_go_down =
 	}
 	
 	self.state = STATE_DOWN;
-	SUB_CalcMove (self.pos1, self.speed2, door_hit_bottom);
+	SUB_CalcMoveLight(self.pos2, self.pos1, self.speed2, door_hit_bottom, TRUE);
+	
+	SUB_UseTargetsAlt(target3);
 }
 
 void() door_go_up =
 {
+	//dprint("door_go_up\n");
 	if (self.state == STATE_UP)
 		return;		// already going up
 
@@ -89,10 +97,11 @@ void() door_go_up =
 	
 	sound (self, CHAN_VOICE, self.noise2, 1, ATTN_NORM);
 	self.state = STATE_UP;
-	SUB_CalcMove (self.pos2, self.speed, door_hit_top);
+	SUB_CalcMoveLight(self.pos1, self.pos2, self.speed, door_hit_top, FALSE);
 	self.frame = !self.skin;
 
-	SUB_UseTargetsSilent();	// door messages are for when they *don't* open
+	if (!SUB_UseTargetsAlt(target))
+		SUB_UseTargetsSilent();	// door messages are for when they *don't* open
 }
 
 /*
@@ -108,6 +117,7 @@ void() door_fire =
 	local entity 	oself;
 	local entity	starte;
 		
+	//dprint("door_fire\n");
 	if (self.owner != self)
 		objerror ("door_fire: self.owner != self");
 
@@ -126,10 +136,7 @@ void() door_fire =
 		{
 			starte = self;
 			do {
-				if (self.classname == "shadowmonitor")
-					door_shadowmonitor_go();
-				else
-					door_go_down ();
+				door_go_down ();
 				self = self.enemy;
 			} while ( (self != starte) && (self != world) );
 			self = oself;
@@ -141,10 +148,7 @@ void() door_fire =
 	starte = self;
 	if ( !( self.spawnflags & DOOR_TOGGLE ) || ( self.spawnflags & DOOR_TOGGLE && self.state == STATE_BOTTOM) )
 	do {
-		if (self.classname == "shadowmonitor")
-			door_shadowmonitor_go();
-		else
-			door_go_up ();
+		door_go_up ();
 		self = self.enemy;
 	} while ( (self != starte) && (self != world) );
 	self = oself;
@@ -153,6 +157,7 @@ void() door_fire =
 
 void() door_use =
 {
+	//dprint("door_use\n");
 	if (self.customflags & CFL_LOCKED) return;
 	if (!( self.spawnflags & DOOR_TOGGLE ) ) 
 	{
@@ -263,9 +268,26 @@ void() door_touch =
 	door_use ();
 }
 
-
-void(entity d) door_lock =
+void(float unlock) door_lock =
 {
+	entity c;
+	
+	//dprint("door_lock\n");
+	if (unlock) door_unlock_do(self);
+	else door_lock_do(self);
+	// inner loop checks for doors that are linked by touch and not targetname
+	c = self.enemy;
+	do {
+		if (c.targetname != self.targetname)	// outer loop will find this one
+			if (unlock) door_unlock_do(c);
+			else door_lock_do(c);
+		c = c.enemy;
+	} while (c != self);
+}
+
+void(entity d) door_lock_do =
+{
+	//dprint("door_lock_do\n");
 	entity e;
 	if (d.customflags & CFL_LOCKED)
 		return;
@@ -295,8 +317,9 @@ void(entity d) door_lock =
 	}
 }
 
-void(entity d) door_unlock =
+void(entity d) door_unlock_do =
 {
+	//dprint("door_unlock_do\n");
 	if (!(d.customflags & CFL_LOCKED))
 		return;
 		
@@ -354,52 +377,6 @@ float(entity d) door_getslocked =
 /*
 =============================================================================
 
-SWITCHABLE SHADOWS
-
-I do not want to screw around with SUB_CalcMove or bog doors down even further with
-thinking-while-moving, so doors with switchable shadows will spawn a little helper
-monitor to do that to keep mover code clean
-
-=============================================================================
-*/
-
-void() door_shadowmonitor_go =
-{
-	float frac;
-	entity o = self.owner;
-	if (o.state == STATE_TOP)
-		frac = 1;
-	else if (o.state == STATE_BOTTOM)
-		frac = 0;
-	else
-		frac = vlen(o.origin - o.pos1) / vlen(o.pos2 - o.pos1);
-	
-	if (o.spawnflags & DOOR_START_OPEN)
-		frac = 1 - frac;
-
-	bmodel_lightstyle(o, light_str(frac));
-
-	self.nextthink = time + min(0.05, (o.nextthink - o.ltime));
-	self.think = door_shadowmonitor_go;
-}
-
-void(entity d) door_shadowmonitor =
-{
-	entity m = spawn();
-	m.classname = "shadowmonitor";
-	m.owner = d;
-	m.enemy = d.enemy;
-	d.enemy = m;
-
-	if (!(d.spawnflags & DOOR_START_OPEN))
-	{
-		bmodel_lightstyle(d, "a");
-	}
-}
-
-/*
-=============================================================================
-
 SPAWNING FUNCTIONS
 
 =============================================================================
@@ -409,7 +386,7 @@ entity(vector fmins, vector fmaxs) door_spawn_field =
 {
 	local entity	trigger;
 	local	vector	t1, t2;
-	dprint("spawning door field\n");
+	//dprint("spawning door field\n");
 	trigger = spawn();
 	trigger.movetype = MOVETYPE_NONE;
 	trigger.solid = SOLID_TRIGGER;
@@ -445,16 +422,20 @@ void(vector cmins, vector cmaxs) door_finalize =
 		return;
 	}
 
-	t = self;
-	do {
-		// put a light fade monitor in the enemy chain
-		if (self.style || self.switchshadstyle)
-		{
-			door_shadowmonitor(t);
-			break;
-		}
-		t = t.enemy;
-	} while (t != self);
+	if (self.style < 0)
+	{
+		self.style *= -1;
+		self.customflags |= CFL_INVLIGHT;
+	}
+	if (self.spawnflags & DOOR_START_OPEN)
+	{
+		if (self.customflags & CFL_INVLIGHT)
+			self.customflags -= CFL_INVLIGHT;
+		else
+			self.customflags |= CFL_INVLIGHT;
+	}
+	
+	bmodel_lightstyle(self, 1);
 
 	if (self.health)
 		return;
@@ -463,6 +444,9 @@ void(vector cmins, vector cmaxs) door_finalize =
 			return;
 	
 	self.trigger_field = door_spawn_field(cmins, cmaxs);
+	
+	if (self.customflags & CFL_LOCKED)
+		door_lock(FALSE);
 }
 
 float(entity door, entity master) door_can_link =
@@ -702,7 +686,7 @@ Key doors are always wait -1.
 "lip"		lip remaining at end of move (8 default)
 "distance"	specify movement distance directly, overrides lip (-1 to explicitly not move)
 "dmg"		damage to inflict when blocked (2 default)
-"noise1-4"	override open/stop/locked/unlocked sounds, respectively
+"noise1-4"	override stop/open/locked/unlocked sounds, respectively
 "sounds"
 0) silent
 1) stone
@@ -711,12 +695,16 @@ Key doors are always wait -1.
 4) hissy metal
 5) winchy secret door
 6) base secret door
+
+Alt Target Pattern: 'target' when starting to open, 'target2' when opened, 'target3' when starting to close, 'target4' when closed.
 */
 /*FGD
-@SolidClass base(Angle, Appearflags, Targetname, Target, Func) = func_door : 
+@SolidClass base(Angle, Appearflags, Targetname, Target, Func, FuncInvis, AltTarget) = func_door : 
 "Door. Opens; closes. 
 If two doors touch, they are assumed to be connected and operate as a unit. Targets, targetnames, and the Crusher and Toggle spawnflags are safely shared between linked doors automatically.
-Doors will not link if either has the 'don't link' spawnflag, if they have different targetnames, or different key requirements." 
+Doors will not link if either has the 'don't link' spawnflag, if they have different targetnames, or different key requirements.
+
+Alt Target Pattern: 'target' when starting to open, 'target2' when opened, 'target3' when starting to close, 'target4' when closed." 
 [
 	speed(integer) : "Speed" : 100
 	speed2(integer) : "Close Speed (if different from open speed)" : 0
@@ -730,8 +718,8 @@ Doors will not link if either has the 'don't link' spawnflag, if they have diffe
 		5: "Winchy secret door"
 		6: "Base secret door"
 	]
-	noise1(string) : "Override move sound"
-	noise2(string) : "Override stop sound"
+	noise1(string) : "Override stop sound"
+	noise2(string) : "Override move sound"
 	noise3(string) : "Override key-required sound"
 	noise4(string) : "Override key-unlocked sound"
 	wait(string) : "Wait before close" : "3" 
@@ -759,15 +747,8 @@ void() func_door =
 	SetMovedir ();
 
 	self.max_health = self.health;
-	self.solid = SOLID_BSP;
-	self.movetype = MOVETYPE_PUSH;
-	setorigin (self, self.origin);	
-	setmodel (self, self.model);
 	//self.classname = "door";
 
-	self.blocked = door_blocked;
-	self.use = door_use;
-	
 	if (!self.speed)
 		self.speed = 100;
 	if (!self.speed2)
@@ -775,10 +756,6 @@ void() func_door =
 	self.dmg = zeroconvertdefault(self.dmg, 2);
 	if (!self.lip)
 		self.lip = 8;
-	self.distance = zeroconvertdefault(self.distance, 
-		BoundsAngleSize( self.movedir, self.size ) - self.lip);
-		// ^^ janky for non-cardinal angles
-
 	if (self.spawnflags & DOOR_SILVER_KEY)
 	{
 		self.items = IT_KEY1;
@@ -795,6 +772,23 @@ void() func_door =
 	
 	if (!self.wait)
 		self.wait = 3;
+	
+	if (self.spawnflags & 128)
+		self.use = func_door_spawn;
+	else
+		func_door_spawn();
+}
+
+void() func_door_spawn =
+{
+	self.solid = SOLID_BSP;
+	self.movetype = MOVETYPE_PUSH;
+	setorigin (self, self.origin);	
+	setmodel (self, self.model);
+
+	self.distance = zeroconvertdefault(self.distance, 
+		BoundsAngleSize( self.movedir, self.size ) - self.lip);
+		// ^^ janky for non-cardinal angles
 		
 	if (self.pos1 && self.pos2)
 	{
@@ -814,7 +808,10 @@ void() func_door =
 		self.th_die = door_killed;
 	}
 	
+	self.blocked = door_blocked;
+	self.use = door_use;
 	self.touch = door_touch;
+	self.lock = door_lock;
 
 	// door_link can't be done until all of the doors have been spawned, so
 	// the sizes can be detected properly.
@@ -900,30 +897,43 @@ void(entity attacker, float damage) secretdoor_pain =
 
 void() secret_shadowmonitor_go =
 {
-	float frac;
+	float opac, done;
 	vector mv, p;
 	entity o = self.owner;
 	
+	self.nextthink = time + min(0.05, (o.nextthink - o.ltime));
+	
 	if (o.think == secretdoor_move2 || o.think == secretdoor_move6)
-		frac = 0;
+	{
+		opac = 1;
+		done = TRUE;
+	}
+	else if (o.think == SUB_Null)
+	{
+		opac = 0;
+		if (o.wait == -1)
+			done = TRUE;
+	}
 	else if (o.think == secretdoor_move4)
-		frac = 1;
+	{
+		opac = 0;
+		self.nextthink += o.wait;
+	}
 	else
 	{
 		mv = o.dest2 - o.dest1;
-		p = o.origin - o.dest1;
-		frac = (p * normalize(mv)) / vlen(mv);
+		p = o.origin - o.dest2;
+		opac = vlen(p) / vlen(mv);
 	}
 
-	bmodel_lightstyle(o, light_str(frac));
+	bmodel_lightstyle(o, opac);
 
-	if ((frac == 0 || frac == 1) && o.wait == -1)
+	if (done)
 	{
 		remove(self);
 		return;
 	}
 	
-	self.nextthink = time + min(0.05, (o.nextthink - o.ltime));
 	self.think = secret_shadowmonitor_go;
 }
 
@@ -931,30 +941,18 @@ void() secret_shadowmonitor_go =
 // Make a sound, wait a little...
 void () secretdoor_move0 = 
 {
+	self.state = STATE_UP;
 	if (self.noise1 != string_null)
 		sound(self, CHAN_VOICE, self.noise1, 1, ATTN_NORM);
 	self.nextthink = self.ltime + 0.1;
-
-	dprint(vtos(self.dest1));
-	dprint("\n");
 	SUB_CalcMove(self.dest1, self.speed, secretdoor_move1);
 	if (self.noise2 != string_null)
 		sound(self, CHAN_VOICE, self.noise2, 1, ATTN_NORM);
-	
-	if (!self.switchshadstyle && !self.style)
-		return;
-	
-	entity s = spawn();
-	s.classname = "shadowmonitor";
-	s.owner = self;
-	SUB_CallAsSelf(secret_shadowmonitor_go, s);
 }
 
 // Wait after first movement...
 void () secretdoor_move1 = 
 {
-	dprint(vtos(self.origin));
-	dprint("\n");
 	self.nextthink = self.ltime + 1.0;
 	self.think = secretdoor_move2;
 	if (self.noise3 != string_null)
@@ -966,14 +964,13 @@ void () secretdoor_move2 =
 {
 	if (self.noise2 != string_null)
 		sound(self, CHAN_VOICE, self.noise2, 1, ATTN_NORM);
-	SUB_CalcMove(self.dest2, self.speed2, secretdoor_move3);
+	SUB_CalcMoveLight(self.dest1, self.dest2, self.speed2, secretdoor_move3, FALSE);
 }
 
 // Wait here until time to go back...
 void () secretdoor_move3 =
 {
-	dprint(vtos(self.origin));
-	dprint("\n");
+	self.state = STATE_TOP;
 	if (self.noise3 != string_null)
 		sound(self, CHAN_VOICE, self.noise3, 1, ATTN_NORM);
 	if (!(self.spawnflags & SECRET_OPEN_ONCE) || self.wait > 0)
@@ -988,10 +985,10 @@ void () secretdoor_move3 =
 // Move backward...
 void () secretdoor_move4 =
 {
-	self.think = SUB_Null;
+	self.state = STATE_DOWN;
 	if (self.noise2 != string_null)
 		sound(self, CHAN_VOICE, self.noise2, 1, ATTN_NORM);
-	SUB_CalcMove(self.dest1, self.speed2, secretdoor_move5);		
+	SUB_CalcMoveLight(self.dest2, self.dest1, self.speed2, secretdoor_move5, TRUE);
 }
 
 // Wait 1 second...
@@ -1013,6 +1010,7 @@ void () secretdoor_move6 =
 
 void () secretdoor_done =
 {
+	self.state = STATE_BOTTOM;
 	self.think1 = SUB_Null;
 	if (!self.targetname || self.spawnflags & SECRET_YES_SHOOT)
 	{
@@ -1029,7 +1027,7 @@ void () secret_blocked =
 	if (time < self.attack_finished)
 		return;
 	self.attack_finished = time + 0.5;
-	T_Damage (other, self, self, self.dmg);
+	T_Damage (other, self, self, self.dmg, DMGTYPE_CRUSH);
 }
 
 /*
@@ -1055,6 +1053,58 @@ void() secret_touch =
 	}
 }
 
+void() secret_door_moves =
+{
+	vector firstmove, secondmove;
+	
+	if (!self.dest1 && !self.dest2)
+	{
+		// dumb old way
+		makevectors(self.mangle);
+		if (self.spawnflags & SECRET_1ST_LEFT)
+			firstmove = v_right * -1;
+		else if (self.spawnflags & SECRET_1ST_DOWN) 
+			firstmove = v_up * -1;
+		else
+			firstmove = v_right;
+		secondmove = v_forward;
+	}
+	else
+	{
+		firstmove = normalize(self.dest1);
+		secondmove = normalize(self.dest2);
+	}
+	
+	if (!self.t_width)
+		self.t_width = BoundsAngleSize(firstmove, self.size);
+		
+	if (!self.t_length)
+		self.t_length = BoundsAngleSize(secondmove, self.size);
+
+	self.dest1 = self.origin + firstmove * self.t_width;
+	self.dest2 = self.dest1 + secondmove * self.t_length;
+}
+
+void() secret_door_find =
+{
+	// ok nobody knows what vectors are? what is our children learning
+	entity p = find(world, targetname, self.target);
+
+	// now we support literal pathcorners like a literal train
+	if (p && p.classname == "path_corner" && p.target != string_null)
+	{
+		entity p2 = find(world, targetname, p.target);
+		if (p2 && p2.classname == "path_corner")
+		{
+			self.dest1 = p.origin - self.mins;
+			self.dest2 = p2.origin - self.mins;
+			
+			return;
+		}
+	}
+
+	secret_door_moves();
+}
 
 /*QUAKED func_door_secret (0 .5 .8) ? OPEN_ONCE 1ST_LEFT 1ST_DOWN NO_SHOOT ALWAYS_SHOOT
 Secret door. Slides back, then to the side. 
@@ -1183,6 +1233,16 @@ void () func_door_secret =
 	if (self.speed <= 0) self.speed = 50;
 	if (self.speed2 <= 0) self.speed2 = self.speed;
 	
+	if (self.spawnflags & SECRET_OPEN_ONCE) self.wait = -1;
+	if (!self.wait) self.wait = 5;	// 5 seconds before closing
+	
+	if (self.style < 0)
+	{
+		self.style *= -1;
+		self.customflags |= CFL_INVLIGHT;
+	}
+	bmodel_lightstyle(self, 1);
+	
 	self.use = secretdoor_use;
 	if ( !self.targetname || self.spawnflags & SECRET_YES_SHOOT)
 	{
@@ -1195,63 +1255,13 @@ void () func_door_secret =
 	}
 	self.oldorigin = self.origin;
 	
-	if (self.spawnflags & SECRET_OPEN_ONCE) self.wait = -1;
-	if (!self.wait) self.wait = 5;	// 5 seconds before closing
-	
-	bmodel_lightstyle(self, "a");
-	
-	// Magic formula...
-	// lunaran: the magic formula sucked
-	// also you moved this to secret_door_use at some point, don't know why, if a secret door breaks somewhere that might be why
-	local vector firstmove, secondmove;
+	self.skin = self.frame;
 	
 	if (self.target != string_null)
 	{
-		// ok nobody knows what vectors are? what is our children learning
-		entity p = find(world, targetname, self.target);
-		// now we support literal pathcorners like a literal train
-		if (p && p.classname == "path_corner" && p.target != string_null)
-		{
-			entity p2 = find(world, targetname, p.target);
-			if (p2 && p2.classname == "path_corner")
-			{
-				self.dest1 = p.origin - self.mins;
-				self.dest2 = p2.origin - self.mins;
-				dprint("dest 1: ");
-				dprint(vtos(self.dest1));
-				dprint(" - dest 2: ");
-				dprint(vtos(self.dest2));
-				dprint("\n");
-				
-				return;
-			}
-		}		
-	}
-	if (!self.dest1 && !self.dest2)
-	{
-		// dumb old way
-		makevectors(self.mangle);
-		if (self.spawnflags & SECRET_1ST_LEFT)
-			firstmove = v_right * -1;
-		else if (self.spawnflags & SECRET_1ST_DOWN) 
-			firstmove = v_up * -1;
-		else
-			firstmove = v_right;
-		secondmove = v_forward;
+		self.think = secret_door_find;
+		self.nextthink = self.ltime + 0.1;
 	}
 	else
-	{
-		firstmove = normalize(self.dest1);
-		secondmove = normalize(self.dest2);
-	}
-	
-	if (!self.t_width)
-		self.t_width = BoundsAngleSize(firstmove, self.size);
-		
-	if (!self.t_length)
-		self.t_length = BoundsAngleSize(secondmove, self.size);
-
-	self.dest1 = self.origin + firstmove * self.t_width;
-	self.dest2 = self.dest1 + secondmove * self.t_length;
-	self.skin = self.frame;
+		secret_door_moves();
 }
