@@ -660,6 +660,7 @@ void() PutClientInServer =
 	player_stand1();
 	
 	// spawns fire targets when spawned at
+	activator = self;
 	SUB_UseEntTargets(spot);
 	if (serverflags & SVFL_RESPAWNING) clear_respawning_flag();
 	
@@ -1100,6 +1101,8 @@ void() WaterMove =
 {
 	if (self.movetype == MOVETYPE_NOCLIP) {
 		self.air_finished = time + 120;
+		self.waterlevel = 0;
+		self.watertype = 0;
 		return;
 	}
 	if (self.health < 0)

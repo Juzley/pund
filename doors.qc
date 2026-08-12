@@ -146,7 +146,8 @@ void() door_fire =
 
 	// trigger all paired doors
 	starte = self;
-	if ( !( self.spawnflags & DOOR_TOGGLE ) || ( self.spawnflags & DOOR_TOGGLE && self.state == STATE_BOTTOM) )
+	if ( !( self.spawnflags & DOOR_TOGGLE ) || 
+		( self.spawnflags & DOOR_TOGGLE && (self.state == STATE_BOTTOM || self.state == STATE_DOWN) ) )
 	do {
 		door_go_up ();
 		self = self.enemy;
@@ -503,7 +504,12 @@ void() door_link =
 				masterdoor.targetname = self.targetname;
 				self.targetname = string_null;
 			}
-			masterdoor.items |= self.items;
+			if (self.items)	// keylocked
+			{
+				masterdoor.items |= self.items;
+				masterdoor.noise3 = self.noise3;
+				masterdoor.noise4 = self.noise4;
+			}
 			if (self.health != 0 && masterdoor.health == 0)
 				masterdoor.health = self.health;
 
@@ -571,6 +577,11 @@ void() door_key_init =
 	}
 	if (self.items)
 	{
+		if (self.owner != self)
+		{
+			self.noise3 = self.owner.noise3;
+			self.noise4 = self.owner.noise4;
+		}
 		entity t = self;
 		do {
 			t.wait = -1;
@@ -815,6 +826,12 @@ void() func_door_spawn =
 
 	// door_link can't be done until all of the doors have been spawned, so
 	// the sizes can be detected properly.
+	if (self.spawnflags & DOOR_DONT_LINK)
+	{
+		self.owner = self.enemy = self;
+		door_finalize(self.mins, self.maxs);
+		return;		// don't want to link this door
+	}
 	self.think = door_link;
 	self.nextthink = self.ltime + 0.1;
 }

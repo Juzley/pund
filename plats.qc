@@ -456,7 +456,7 @@ void() train_sounds =
 	]
 ]
 @baseclass base(Appearflags, Targetname, TrainSounds, Func, AltTarget) = Train [
-	speed(integer) : "Speed (units per second)" : 64
+	speed(integer) : "Speed (units per second)" : 100
 	target(target_source) : "Target to start at"
 	dmg(integer) : "Damage on block" : 2
 	noise(string) : "Override stop sound"
@@ -751,6 +751,7 @@ void() train_on =
 
 void() train_use =
 {
+	self.aiment = activator;	// .enemy is used so we store activating player here
 	if ((self.spawnflags & TRAIN_TOGGLE) && (self.origin + self.movedir) != self.enemy.origin)
 	{
 		if (self.state == STATE_ON)
@@ -786,6 +787,13 @@ void() train_wait =	// arrival at a pathcorner
 	else
 		self.wait = self.pausetime;
 	
+	// if a player is riding the train, treat them as activator
+	activator = self.aiment;
+	if (activator.classname != "player")
+	{
+		activator = get_closest_client();
+		self.aiment = activator;
+	}
 	SUB_UseTargetsAlt(target2);
 
 	if (self.wait == -1)
@@ -807,10 +815,7 @@ void() train_wait =	// arrival at a pathcorner
 		train_next();
 	}
 	
-	// trains now fire their pathcorners' targets on arrival
-	// if a player is riding the train, treat them as activator
-	if (activator.classname != "player")
-		activator = get_closest_client();
+	// fire pathcorners' targets on arrival
 	SUB_UseEntTargets(corner);
 	// fire them after sorting corner wait stuff, in case the corner triggers
 	// the train itself (useful for wait-locking a pathcorner with a relay)
@@ -876,8 +881,8 @@ void() train_next =	// departure for next pathcorner
 		if (ctrl.count)
 			segs = ctrl.count;
 		else
-			// chop the curve into roughly 200ms segments
-			segs = ceil(5 * bez_lenApprox(self.origin, ctrl.origin, corner.origin) / ((self.speed + dspeed) / 2));
+			// chop the curve into roughly 166ms segments
+			segs = ceil(6 * bez_lenApprox(self.origin + self.movedir, ctrl.origin, corner.origin) / ((self.speed + dspeed) / 2));
 
 		SUB_CalcMoveCurve(corner.origin - self.movedir, ctrl.origin - self.movedir, segs, self.speed, dspeed, self.th_stand);
 		return;

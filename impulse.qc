@@ -45,6 +45,7 @@ void() Cheat_Items =
 
 	self.items = self.items | IT_LIGHTNING;
 
+	W_SetCurrentAmmo();
 	W_Select(IT_ROCKET_LAUNCHER);
 
 	stuffcmd(self,"bf\n");
@@ -199,6 +200,9 @@ void() ImpulseCommands =
 		break;
 	case 15:
 		W_SelectBestWeapon();
+		break;
+	case 16:
+		W_SelectLastWeapon();
 		break;
 
 	case 40:

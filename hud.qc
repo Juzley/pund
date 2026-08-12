@@ -261,13 +261,13 @@ void Hud_DrawArmorIcon(vector pos)
 void Hud_DrawCurrentAmmoIcon(vector pos)
 {
 	if (stat_items & IT_SHELLS)
-		drawpic(pos, "sb_shells", '24 24', '1 1 1', 1, 0);
+		drawpic(pos, "sb_shellsb", '24 24', '1 1 1', 1, 0);
 	else if (stat_items & IT_NAILS)
-		drawpic(pos, "sb_nails", '24 24', '1 1 1', 1, 0);
+		drawpic(pos, "sb_nailsb", '24 24', '1 1 1', 1, 0);
 	else if (stat_items & IT_ROCKETS)
-		drawpic(pos, "sb_rocket", '24 24', '1 1 1', 1, 0);
+		drawpic(pos, "sb_rocketb", '24 24', '1 1 1', 1, 0);
 	else if (stat_items & IT_CELLS)
-		drawpic(pos, "sb_cells", '24 24', '1 1 1', 1, 0);
+		drawpic(pos, "sb_cellsb", '24 24', '1 1 1', 1, 0);
 }
 
 void Hud_DrawSBar(vector pos)
@@ -380,7 +380,7 @@ void Hud_DrawSigils(vector pos)
 	{
 		if (time < itemtimes[24] + 1.5) pulse = 1.2 - 2 * ((time - itemtimes[24]) % 0.5);
 		else pulse = 1;
-		drawpic(pos + '9 0', "sb_sigil2", '8 16', '1 1 1', pulse, 0);
+		drawpic(pos + '8 0', "sb_sigil2", '8 16', '1 1 1', pulse, 0);
 	}
 	if (stat_items2 & 128)
 	{
@@ -659,8 +659,9 @@ void Hud_DrawModernCenter(vector pos, float expanded)
 void Hud_DrawRankings(vector pos)
 {
 	drawpic(pos + '78 0', "gfx/ranking.lmp", '164 24', '1 1 1', 1);
+	Hud_ScrollTextBox(pos + '0 26', 0, 0, 320, 8, 8, world.message);
 	
-	Hud_DrawMultiplayer(pos + '72 32', '0 12', MP_WIDE);
+	Hud_DrawMultiplayer(pos + '72 36', '0 12', MP_WIDE);
 }
 
 // ================================================================
@@ -835,7 +836,7 @@ void(vector screensize, float scoreboard) CSQC_DrawScores =
 	float value, mins, secs;
 	string s;
 	
-	pos = [screensize_x / 2 - 160, screensize_y / 2 - 120];
+	pos = [max(0,screensize_x / 2 - 160), max(0,screensize_y / 2 - 120)];
 	
 	if (deathmatch)
 	{
@@ -845,17 +846,19 @@ void(vector screensize, float scoreboard) CSQC_DrawScores =
 	
 	drawpic(pos + '64 0', "gfx/complete.lmp", '196 24', '1 1 1', 1);
 
-	s = strcat(world.message, " (", mapname, ")");
-	Hud_ScrollTextBox(pos + '2 26', 0, 0, 320, 8, 8, s);
+	Hud_ScrollTextBox(pos + '0 26', 0, 0, 320, 8, 8, world.message);
 	if (skill == 0)
-		drawstring(pos + '144 36', "Easy", '8 8', '1 1 1', 1, 0);
-	if (skill == 1)
-		drawstring(pos + '136 36', "Normal", '8 8', '1 1 1', 1, 0);
-	if (skill == 2)
-		drawstring(pos + '144 36', "Hard", '8 8', '1 1 1', 1, 0);
-	if (skill == 3)
-		drawstring(pos + '126 36', "\bNightmare\b", '8 8', '1 1 1', 1, 0);
+		s = strcat(mapname, " - Easy");
+	else if (skill == 1)
+		s = strcat(mapname, " - Normal");
+	else if (skill == 2)
+		s = strcat(mapname, " - Hard");
+	else if (skill == 3)
+		s = strcat(mapname, " - \bNightmare\b");
 
+	value = stringwidth( s, TRUE, '8 8');
+	drawstring(pos + [160 - value/2, 36], s, '8 8', '1 1 1', 1, 0);
+	
 	mins = floor(intermission_time / 60);
 	secs = floor(intermission_time - mins * 60);
 
@@ -880,9 +883,11 @@ void(vector screensize, float scoreboard) CSQC_DrawScores =
 		div += '24 0';
 	}
 	
+	drawpic(pos + '0 48', "gfx/inter2.lmp", '160 144', '1 1 1', 1);
+	
 	// kills
 	pos += '0 56';
-	drawsubpic(pos + '51 2', '96 24', "gfx/inter.lmp", [8/160, 88/144], [96/160, 24/144], '1 1 1', 1);
+	//drawsubpic(pos + '51 2', '96 24', "gfx/inter2.lmp", [8/160, 88/144], [96/160, 24/144], '1 1 1', 1);
 	
 	value = clampf(getstatf(STAT_MONSTERS), 9999);
 	Hud_DrawLargeValue(pos+div, value, -1);
@@ -892,7 +897,7 @@ void(vector screensize, float scoreboard) CSQC_DrawScores =
 	
 	// secrets
 	pos += '0 36';
-	drawsubpic(pos + '8 2', '136 24', "gfx/inter.lmp", [8/160, 48/144], [136/160, 24/144], '1 1 1', 1);
+	//drawsubpic(pos + '8 2', '136 24', "gfx/inter2.lmp", [8/160, 48/144], [136/160, 24/144], '1 1 1', 1);
 	
 	value = clampf(getstatf(STAT_SECRETS), 9999);
 	Hud_DrawLargeValue(pos+div, value, -1);
@@ -902,7 +907,7 @@ void(vector screensize, float scoreboard) CSQC_DrawScores =
 	
 	// time
 	pos += '0 36';
-	drawsubpic(pos + '67 2', '80 24', "gfx/inter.lmp", [8/160, 8/144], [80/160, 24/144], '1 1 1', 1);
+	//drawsubpic(pos + '67 2', '80 24', "gfx/inter2.lmp", [8/160, 8/144], [80/160, 24/144], '1 1 1', 1);
 	
 	mins = clampf(mins, 999);
 	Hud_DrawLargeValue(pos+div, mins, -1);
@@ -975,9 +980,15 @@ void() Hud_Init
 	precache_pic("sb_ammon", TRUE);
 	precache_pic("sb_ammor", TRUE);
 	
+	precache_pic("sb_cellsb", TRUE);
+	precache_pic("sb_nailsb", TRUE);
+	precache_pic("sb_shellsb", TRUE);
+	precache_pic("sb_rocketb", TRUE);
+	
 	precache_pic("sb_teams", TRUE);
 	
 	precache_pic("gfx/complete.lmp", FALSE);
+	precache_pic("gfx/inter2.lmp", FALSE);
 	
 	paintime = -1;
 	lookseed = floor(random() * 100);
