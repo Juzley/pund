@@ -614,7 +614,7 @@ void() monster_rocket_ogre_spawn =
 	self.solid = SOLID_SLIDEBOX;
 	//self.movetype = MOVETYPE_STEP;
 
-	setmodel (self, "progs/ogre.mdl");
+	setmodel (self, "progs/rogre.mdl");
 
 	setsize (self, VEC_HULL2_MIN, '32 32 40');
 	self.health = 200;
@@ -629,7 +629,7 @@ void() monster_rocket_ogre_spawn =
 	self.th_checkattack = OgreCheckAttack;
 
 	if (self.deathtype == string_null)
-		self.deathtype = "was destroyed by an Ogre";
+		self.deathtype = "was rocked by a Rocket Ogre";
 
 	walkmonster_start();
 }
@@ -653,7 +653,7 @@ Keys:
 "movedir" set to a velocity to make the monster jump on awakening
 */
 /*FGD
-@PointClass base(Monster) size(-32 -32 -24, 32 32 64) model({ "path": ":progs/ogre.mdl" }) = monster_rocket_ogre : "Rocket Ogre" []
+@PointClass base(Monster) size(-32 -32 -24, 32 32 64) model({ "path": ":progs/rogre.mdl" }) = monster_rocket_ogre : "Rocket Ogre" []
 */
 void() monster_rocket_ogre =
 {
@@ -665,7 +665,7 @@ void() monster_rocket_ogre =
 		return;
 	}
 
-	precache_model ("progs/ogre.mdl");
+	precache_model ("progs/rogre.mdl");
 	precache_model ("progs/h_ogre.mdl");
 	precache_model ("progs/grenade.mdl");
 
